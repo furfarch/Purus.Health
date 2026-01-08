@@ -1,4 +1,4 @@
-my health dataimport Foundation
+import Foundation
 import SwiftData
 
 @Model

@@ -18,7 +18,7 @@ enum macOSPDFRenderer {
 
     private final class NavigationDelegate: NSObject, WKNavigationDelegate {
         private var continuation: CheckedContinuation<Void, Error>?
-        private(set) var didFinish: Void {
+        var didFinish: Void {
             get async throws {
                 try await withCheckedThrowingContinuation { (c: CheckedContinuation<Void, Error>) in
                     continuation = c

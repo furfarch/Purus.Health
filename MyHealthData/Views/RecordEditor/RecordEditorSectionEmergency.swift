@@ -22,7 +22,11 @@ struct RecordEditorSectionEmergency: View {
                         if let index = record.emergencyContacts.firstIndex(where: { $0.id == toDelete.id }) {
                             let removed = record.emergencyContacts.remove(at: index)
                             // delete from context if it was inserted into modelContext
-                            if let e = removed as? @unchecked Sendable { }
+                            if let e = removed as? EmergencyContact {
+                                // if this object was persisted you may want to remove it from the model context
+                                // modelContext.delete(e) // optional: delete from context if appropriate
+                                _ = e
+                            }
                         }
                         onChange()
                     } label: {

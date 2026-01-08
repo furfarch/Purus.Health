@@ -1,4 +1,4 @@
- import SwiftUI
+import SwiftUI
 import SwiftData
 
 struct RecordEditorSectionWeight: View {
@@ -14,23 +14,27 @@ struct RecordEditorSectionWeight: View {
 
     var body: some View {
         Section {
-            ForEach(record.weights.indices, id: \ .self) { idx in
-                let binding = Binding(
-                    get: { record.weights[idx] },
-                    set: { record.weights[idx] = $0 }
+            ForEach(Array(record.weights.indices), id: \.self) { idx in
+                // Bindings for the specific weight entry fields
+                let dateBinding = Binding(
+                    get: { record.weights[idx].date ?? Date() },
+                    set: { record.weights[idx].date = $0 }
                 )
 
-                DatePicker(
-                    "Date",
-                    selection: Binding(
-                        get: { binding.date ?? Date() },
-                        set: { binding.date = $0 }
-                    ),
-                    displayedComponents: .date
+                let weightKgBinding = Binding(
+                    get: { record.weights[idx].weightKg },
+                    set: { record.weights[idx].weightKg = $0 }
                 )
+
+                let commentBinding = Binding(
+                    get: { record.weights[idx].comment },
+                    set: { record.weights[idx].comment = $0 }
+                )
+
+                DatePicker("Date", selection: dateBinding, displayedComponents: .date)
 
                 HStack {
-                    TextField("Weight (kg)", value: binding.weightKg, format: .number)
+                    TextField("Weight (kg)", value: weightKgBinding, format: .number)
                     Spacer()
                     Button(role: .destructive) {
                         record.weights.remove(at: idx)
@@ -40,7 +44,7 @@ struct RecordEditorSectionWeight: View {
                     }
                 }
 
-                TextField("Comment", text: binding.comment, axis: .vertical)
+                TextField("Comment", text: commentBinding, axis: .vertical)
                     .lineLimit(1...3)
             }
 

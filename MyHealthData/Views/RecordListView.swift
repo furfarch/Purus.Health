@@ -9,6 +9,12 @@ struct RecordListView: View {
     @State private var showingNewRecordType = false
     @State private var showingAbout = false
 
+    private static let buildDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM"
+        return f
+    }()
+
     var body: some View {
         NavigationSplitView {
             List(selection: $selection) {
@@ -31,7 +37,7 @@ struct RecordListView: View {
             }
             .navigationTitle("My Health Data")
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .automatic) {
                     Button {
                         showingAbout = true
                     } label: {
@@ -85,9 +91,7 @@ struct RecordListView: View {
                     .bold()
 
                 // Build date: use current date formatted yyyy-MM (approximate build date)
-                let formatter = DateFormatter()
-                formatter.dateFormat = "yyyy-MM"
-                Text("Build: \(formatter.string(from: Date()))")
+                Text("Build: \(Date(), formatter: Self.buildDateFormatter)")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
