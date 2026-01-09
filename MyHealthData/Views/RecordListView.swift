@@ -36,6 +36,9 @@ struct RecordListView: View {
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
+                                Spacer()
+                                Image(systemName: cloudStatusIcon(for: record))
+                                    .foregroundColor(cloudStatusColor(for: record))
                             }
                         }
                     }
@@ -139,6 +142,20 @@ struct RecordListView: View {
             if family.isEmpty && given.isEmpty { return "Person" }
             return [given, family].filter { !$0.isEmpty }.joined(separator: " ")
         }
+    }
+
+    private func cloudStatusIcon(for record: MedicalRecord) -> String {
+        if record.isCloudEnabled {
+            return record.isSharingEnabled ? "person.2.circle" : "icloud"
+        }
+        return "iphone"
+    }
+
+    private func cloudStatusColor(for record: MedicalRecord) -> Color {
+        if record.isCloudEnabled {
+            return record.isSharingEnabled ? .green : .blue
+        }
+        return .secondary
     }
 }
 

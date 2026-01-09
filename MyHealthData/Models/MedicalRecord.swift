@@ -71,9 +71,13 @@ final class MedicalRecord {
     var isCloudEnabled: Bool = false
     var cloudRecordName: String? = nil
 
-    /// True once a CloudKit share has been created for this record.
-    /// (We store it locally so the list can show a share icon without network calls.)
-    var isCloudShared: Bool = false
+    /// Per-record sharing toggle.
+    /// When true, we try to ensure a CKShare exists for this record.
+    var isSharingEnabled: Bool = false
+
+    /// Optional display string for participants (UI-only, best effort).
+    /// For now this may remain empty; we'll populate it later when we add participant fetching.
+    var shareParticipantsSummary: String = ""
 
     init(
         uuid: String = UUID().uuidString,
@@ -110,7 +114,8 @@ final class MedicalRecord {
         emergencyContacts: [EmergencyContact] = [],
         isCloudEnabled: Bool = false,
         cloudRecordName: String? = nil,
-        isCloudShared: Bool = false
+        isSharingEnabled: Bool = false,
+        shareParticipantsSummary: String = ""
     ) {
         self.uuid = uuid
         self.createdAt = createdAt
@@ -152,6 +157,7 @@ final class MedicalRecord {
 
         self.isCloudEnabled = isCloudEnabled
         self.cloudRecordName = cloudRecordName
-        self.isCloudShared = isCloudShared
+        self.isSharingEnabled = isSharingEnabled
+        self.shareParticipantsSummary = shareParticipantsSummary
     }
 }

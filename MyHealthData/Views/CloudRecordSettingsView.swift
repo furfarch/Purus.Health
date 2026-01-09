@@ -10,7 +10,10 @@ struct CloudRecordSettingsView: View {
 
     @State private var syncingRecordID: String?
     @State private var errorMessage: String?
+
     @State private var sharingRecord: MedicalRecord?
+    @State private var pendingShareRecord: MedicalRecord?
+    @State private var showShareConfirm: Bool = false
 
     var body: some View {
         Form {
@@ -41,30 +44,52 @@ struct CloudRecordSettingsView: View {
             }
         }
         .navigationTitle("iCloud")
-        .sheet(item: $sharingRecord) { record in
+        .confirmationDialog(
+            "Create Share?",
+            isPresented: $showShareConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Create Share") {
+                sharingRecord = pendingShareRecord
+                pendingShareRecord = nil
+            }
+            Button("Cancel", role: .cancel) {
+                // If user cancels, also revert the toggle.
+                pendingShareRecord?.isSharingEnabled = false
+                pendingShareRecord = nil
+            }
+        } message: {
+            Text("This will create a CloudKit share link for this record.")
+        }
+        .sheet(item: $sharingRecord, onDismiss: {
+            sharingRecord = nil
+        }) { record in
             CloudShareSheet(record: record)
         }
     }
 
     @ViewBuilder
     private func recordRow(for record: MedicalRecord) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(displayName(for: record))
                     .font(.headline)
                 Spacer()
-
-                Image(systemName: cloudStatusIcon(for: record))
-                    .foregroundStyle(cloudStatusColor(for: record))
+                Image(systemName: record.isCloudEnabled ? (record.isSharingEnabled ? "person.2.circle" : "icloud") : "iphone")
+                    .foregroundStyle(record.isCloudEnabled ? (record.isSharingEnabled ? .green : .blue) : .secondary)
             }
 
             Toggle("Sync", isOn: Binding(
                 get: { record.isCloudEnabled },
                 set: { newValue in
                     record.isCloudEnabled = newValue
+
                     if !newValue {
-                        record.isCloudShared = false
+                        // Turning off sync also turns off sharing.
+                        record.isSharingEnabled = false
+                        record.shareParticipantsSummary = ""
                     }
+
                     record.updatedAt = Date()
                     try? modelContext.save()
                 }
@@ -72,19 +97,54 @@ struct CloudRecordSettingsView: View {
             .disabled(!cloudEnabled)
 
             HStack {
-                Button("Sync Now") {
+                Button {
                     Task { await syncNow(record) }
+                } label: {
+                    if syncingRecordID == record.id {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                            Text("Syncing…")
+                        }
+                    } else {
+                        Text("Sync Now")
+                    }
                 }
+                .buttonStyle(.bordered)
                 .disabled(!cloudEnabled || !record.isCloudEnabled || syncingRecordID == record.id)
 
                 Spacer()
-
-                Button("Share") {
-                    sharingRecord = record
-                }
-                .disabled(!cloudEnabled || !record.isCloudEnabled)
             }
-            .font(.subheadline)
+
+            Toggle("Sharing", isOn: Binding(
+                get: { record.isSharingEnabled },
+                set: { newValue in
+                    // Sharing requires sync.
+                    if newValue {
+                        guard cloudEnabled, record.isCloudEnabled else {
+                            record.isSharingEnabled = false
+                            return
+                        }
+                        // Ask for confirmation + present share UI.
+                        record.isSharingEnabled = true
+                        pendingShareRecord = record
+                        showShareConfirm = true
+                    } else {
+                        // MVP: local-only toggle. Unsharing CloudKit records can be added later.
+                        record.isSharingEnabled = false
+                        record.shareParticipantsSummary = ""
+                    }
+
+                    record.updatedAt = Date()
+                    try? modelContext.save()
+                }
+            ))
+            .disabled(!cloudEnabled || !record.isCloudEnabled)
+
+            if record.isSharingEnabled {
+                Text(record.shareParticipantsSummary.isEmpty ? "Shared with: (not loaded yet)" : "Shared with: \(record.shareParticipantsSummary)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
 
             if !cloudEnabled {
                 Text("Enable iCloud Sync above to manage per-record syncing.")
@@ -123,20 +183,6 @@ struct CloudRecordSettingsView: View {
             if family.isEmpty && given.isEmpty { return "Person" }
             return [given, family].filter { !$0.isEmpty }.joined(separator: " ")
         }
-    }
-
-    private func cloudStatusIcon(for record: MedicalRecord) -> String {
-        if record.isCloudEnabled {
-            return record.isCloudShared ? "person.2.circle" : "icloud"
-        }
-        return "iphone"
-    }
-
-    private func cloudStatusColor(for record: MedicalRecord) -> Color {
-        if record.isCloudEnabled {
-            return record.isCloudShared ? .green : .blue
-        }
-        return .secondary
     }
 }
 

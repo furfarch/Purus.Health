@@ -88,7 +88,8 @@ final class CloudSyncService {
             self.database.add(modify)
         }
 
-        record.isCloudShared = true
+        // Update local state so the UI can show "shared".
+        record.isSharingEnabled = true
         return savedShare
     }
 
