@@ -10,20 +10,25 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
-                NavigationLink {
-                    CloudRecordSettingsView()
-                } label: {
-                    Label("iCloud", systemImage: "icloud")
+                Section {
+                    NavigationLink {
+                        ExportSettingsView()
+                    } label: {
+                        Label("Export", systemImage: "square.and.arrow.up")
+                    }
                 }
 
-                Section("Diagnostics") {
-                    LabeledContent("Container", value: containerIdentifier)
+                Section("iCloud") {
+                    NavigationLink {
+                        CloudRecordSettingsView()
+                    } label: {
+                        Label("iCloud Sync and Sharing of Records", systemImage: "icloud")
+                    }
 
-                    if let accountStatus {
-                        LabeledContent("Account", value: accountStatusText(accountStatus))
-                    } else {
-                        Text("Checking iCloud status…")
-                            .font(.caption)
+                    HStack {
+                        Text("Status")
+                        Spacer()
+                        Text(accountStatus.map(accountStatusText) ?? "Checking…")
                             .foregroundStyle(.secondary)
                     }
 
@@ -36,16 +41,6 @@ struct SettingsView: View {
                     Button("Re-check iCloud Status") {
                         Task { await refreshAccountStatus() }
                     }
-
-                    Text("Simulator note: if the Simulator isn't signed into iCloud, CloudKit will show 'No iCloud account'.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Section("Console messages") {
-                    Text("Messages like CA Event failures are iOS Simulator system logs and can be ignored.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
             }
             .navigationTitle("Settings")

@@ -13,6 +13,14 @@ final class CloudSyncService {
 
     private let containerIdentifier = "iCloud.com.furfarch.MyHealthData"
 
+    /// CloudKit record type used for MedicalRecord mirrors.
+    /// IMPORTANT:
+    /// - CloudKit schemas are environment-specific (Development vs Production).
+    /// - You can't create new record types in the Production schema from the client.
+    ///   If you see: "Cannot create new type … in production schema",
+    ///   create the record type in the CloudKit Dashboard (Development), then deploy to Production.
+    private let medicalRecordType = "MedicalRecord"
+
     private var container: CKContainer { CKContainer(identifier: containerIdentifier) }
     private var database: CKDatabase { container.privateCloudDatabase }
 
@@ -44,7 +52,7 @@ final class CloudSyncService {
             ckRecord = try await database.record(for: ckID)
         } catch {
             // If it doesn't exist yet, create a new one.
-            ckRecord = CKRecord(recordType: "MedicalRecord", recordID: ckID)
+            ckRecord = CKRecord(recordType: medicalRecordType, recordID: ckID)
         }
 
         applyMedicalRecord(record, to: ckRecord)
@@ -76,7 +84,7 @@ final class CloudSyncService {
         let modify = CKModifyRecordsOperation(recordsToSave: [root, share], recordIDsToDelete: nil)
         modify.savePolicy = .changedKeys
 
-        let savedShare: CKShare = try await withCheckedThrowingContinuation { cont in
+        return try await withCheckedThrowingContinuation { cont in
             modify.modifyRecordsResultBlock = { result in
                 switch result {
                 case .success:
@@ -87,10 +95,6 @@ final class CloudSyncService {
             }
             self.database.add(modify)
         }
-
-        // Update local state so the UI can show "shared".
-        record.isSharingEnabled = true
-        return savedShare
     }
 
     // MARK: - Mapping

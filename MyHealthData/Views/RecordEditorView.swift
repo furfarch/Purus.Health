@@ -5,21 +5,12 @@ import UniformTypeIdentifiers
 struct RecordEditorView: View {
     @Environment(\.modelContext) private var modelContext
 
-    @AppStorage("cloudEnabled") private var cloudEnabled: Bool = false
-
     @Bindable var record: MedicalRecord
 
     @State private var isEditing = false
     @State private var selectedSection: RecordSection = .personal
 
-    @State private var exportErrorMessage: String?
-    @State private var exportURL: URL?
-
     @State private var saveErrorMessage: String?
-
-    @State private var cloudErrorMessage: String?
-    @State private var isCloudBusy: Bool = false
-    @State private var showShareSheet: Bool = false
 
     @Environment(\.dismiss) private var dismiss
 
@@ -38,13 +29,26 @@ struct RecordEditorView: View {
             }
         }
         .navigationTitle(displayName)
-        .toolbar { toolbarContent }
-        .fileExporter(
-            isPresented: Binding(get: { exportURL != nil }, set: { if !$0 { exportURL = nil } }),
-            document: exportURL.map { ExportFileDocument(fileURL: $0) },
-            contentType: .data,
-            defaultFilename: exportURL?.lastPathComponent ?? "export"
-        ) { _ in }
+        .toolbar {
+            // Status icons shown in both view + edit modes.
+            ToolbarItem(placement: .principal) {
+                HStack(spacing: 8) {
+                    Text(displayName)
+                        .font(.headline)
+                        .lineLimit(1)
+
+                    Image(systemName: storageStatusIcon)
+                        .foregroundStyle(storageStatusColor)
+
+                    if record.isSharingEnabled {
+                        Image(systemName: "person.2.circle")
+                            .foregroundStyle(.green)
+                    }
+                }
+            }
+
+            toolbarContent
+        }
         .alert("Save Error", isPresented: Binding(get: { saveErrorMessage != nil }, set: { if !$0 { saveErrorMessage = nil } })) {
             Button("OK", role: .cancel) { saveErrorMessage = nil }
         } message: {
@@ -52,9 +56,17 @@ struct RecordEditorView: View {
         }
     }
 
+    private var storageStatusIcon: String {
+        record.isCloudEnabled ? "icloud" : "iphone"
+    }
+
+    private var storageStatusColor: Color {
+        record.isCloudEnabled ? .blue : .secondary
+    }
+
     private var editList: some View {
         List {
-            // Cloud sync & sharing controls were moved to Settings → iCloud.
+            // Cloud sync & sharing are managed in Settings → iCloud.
 
             RecordEditorSectionPersonal(record: record, onChange: touch)
             RecordEditorSectionEmergency(modelContext: modelContext, record: record, onChange: touch)
@@ -68,12 +80,7 @@ struct RecordEditorView: View {
             RecordEditorSectionMedicalHistory(modelContext: modelContext, record: record, onChange: touch)
             RecordEditorSectionRisks(modelContext: modelContext, record: record, onChange: touch)
 
-            if let exportErrorMessage {
-                Section {
-                    Text(exportErrorMessage)
-                        .foregroundStyle(.red)
-                }
-            }
+            // Export moved to Settings (per-record)
         }
     }
 
@@ -285,62 +292,6 @@ struct RecordEditorView: View {
                      isEditing = true
                  }
              }
-
-            Menu {
-                Button("Export JSON") { Task { await exportJSON() } }
-                Button("Export HTML") { Task { await exportHTML() } }
-                Button("Export PDF") { Task { await exportPDF() } }
-            } label: {
-                Label("Export", systemImage: "square.and.arrow.up")
-            }
         }
-    }
-
-    // MARK: - Export
-
-    private func exportJSON() async {
-        await export(type: "json") {
-            try ExportService.makeJSONData(for: record)
-        }
-    }
-
-    private func exportHTML() async {
-        await export(type: "html") {
-            Data(ExportService.makeHTMLString(for: record).utf8)
-        }
-    }
-
-    private func exportPDF() async {
-        exportErrorMessage = nil
-        do {
-            let data = try await ExportService.makePDFData(for: record)
-            try await writeExport(data: data, type: "pdf")
-        } catch {
-            exportErrorMessage = "Export PDF failed: \(error.localizedDescription)"
-        }
-    }
-
-    private func export(type: String, makeData: () throws -> Data) async {
-        exportErrorMessage = nil
-        do {
-            let data = try makeData()
-            try await writeExport(data: data, type: type)
-        } catch {
-            exportErrorMessage = "Export \(type.uppercased()) failed: \(error.localizedDescription)"
-        }
-    }
-
-    @MainActor
-    private func writeExport(data: Data, type: String) async throws {
-        let safeName = displayName.replacingOccurrences(of: "/", with: "-")
-        let fileName = "\(safeName.isEmpty ? "MedicalRecord" : safeName).\(type)"
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
-        try data.write(to: url, options: [.atomic])
-
-        // Exports should be unencrypted (no file protection).
-        // This does NOT affect the app's internal database.
-        try? AppFileProtection.apply(to: url, protection: .none)
-
-        exportURL = url
     }
 }
