@@ -51,16 +51,17 @@ final class CloudSyncService {
         do {
             ckRecord = try await database.record(for: ckID)
         } catch {
-            // If it doesn't exist yet, create a new one.
             ckRecord = CKRecord(recordType: medicalRecordType, recordID: ckID)
         }
 
         applyMedicalRecord(record, to: ckRecord)
 
-        let saved = try await database.save(ckRecord)
-
-        // Persist back CloudKit identity
-        record.cloudRecordName = saved.recordID.recordName
+        do {
+            let saved = try await database.save(ckRecord)
+            record.cloudRecordName = saved.recordID.recordName
+        } catch {
+            throw enrichCloudKitError(error)
+        }
     }
 
     func disableCloud(for record: MedicalRecord) {
@@ -76,7 +77,13 @@ final class CloudSyncService {
 
         let recordName = record.cloudRecordName ?? record.uuid
         let rootID = CKRecord.ID(recordName: recordName)
-        let root = try await database.record(for: rootID)
+
+        let root: CKRecord
+        do {
+            root = try await database.record(for: rootID)
+        } catch {
+            throw enrichCloudKitError(error)
+        }
 
         let share = CKShare(rootRecord: root)
         share[CKShare.SystemFieldKey.title] = "Shared Medical Record" as CKRecordValue
@@ -84,17 +91,42 @@ final class CloudSyncService {
         let modify = CKModifyRecordsOperation(recordsToSave: [root, share], recordIDsToDelete: nil)
         modify.savePolicy = .changedKeys
 
-        return try await withCheckedThrowingContinuation { cont in
-            modify.modifyRecordsResultBlock = { result in
-                switch result {
-                case .success:
-                    cont.resume(returning: share)
-                case .failure(let error):
-                    cont.resume(throwing: error)
+        do {
+            let savedShare: CKShare = try await withCheckedThrowingContinuation { cont in
+                modify.modifyRecordsResultBlock = { result in
+                    switch result {
+                    case .success:
+                        cont.resume(returning: share)
+                    case .failure(let error):
+                        cont.resume(throwing: error)
+                    }
                 }
+                self.database.add(modify)
             }
-            self.database.add(modify)
+
+            // Only mark sharing as enabled after CloudKit succeeded.
+            record.isSharingEnabled = true
+            return savedShare
+        } catch {
+            throw enrichCloudKitError(error)
         }
+    }
+
+    // MARK: - Error mapping
+
+    private func enrichCloudKitError(_ error: Error) -> Error {
+        let message = String(describing: error)
+        if message.contains("Cannot create new type") && message.contains("production schema") {
+            return NSError(
+                domain: "CloudSyncService",
+                code: 2,
+                userInfo: [
+                    NSLocalizedDescriptionKey:
+                        "CloudKit isn’t configured yet. The record type ‘\(medicalRecordType)’ doesn’t exist in the Production schema. Create it in the CloudKit Dashboard (Development) and deploy the schema to Production."
+                ]
+            )
+        }
+        return error
     }
 
     // MARK: - Mapping
