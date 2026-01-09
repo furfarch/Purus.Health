@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 
 struct RecordEditorSectionEmergency: View {
+    let modelContext: ModelContext
     @Bindable var record: MedicalRecord
     let onChange: () -> Void
 
@@ -10,6 +11,7 @@ struct RecordEditorSectionEmergency: View {
             TextField("Emergency Contact Name", text: $record.emergencyName)
             TextField("Emergency Contact Number", text: $record.emergencyNumber)
             TextField("Emergency Contact Email", text: $record.emergencyEmail)
+
             ForEach(record.emergencyContacts.indices, id: \.self) { idx in
                 HStack {
                     TextField("Name", text: Binding(
@@ -18,21 +20,14 @@ struct RecordEditorSectionEmergency: View {
                     ))
                     Spacer()
                     Button(role: .destructive) {
-                        let toDelete = record.emergencyContacts[idx]
-                        if let index = record.emergencyContacts.firstIndex(where: { $0.id == toDelete.id }) {
-                            let removed = record.emergencyContacts.remove(at: index)
-                            // delete from context if it was inserted into modelContext
-                            if let e = removed as? EmergencyContact {
-                                // if this object was persisted you may want to remove it from the model context
-                                // modelContext.delete(e) // optional: delete from context if appropriate
-                                _ = e
-                            }
-                        }
+                        let removed = record.emergencyContacts.remove(at: idx)
+                        modelContext.delete(removed)
                         onChange()
                     } label: {
                         Image(systemName: "trash")
                     }
                 }
+
                 TextField("Phone", text: Binding(
                     get: { record.emergencyContacts[idx].phone },
                     set: { record.emergencyContacts[idx].phone = $0 }
@@ -46,6 +41,12 @@ struct RecordEditorSectionEmergency: View {
                     set: { record.emergencyContacts[idx].note = $0 }
                 ), axis: .vertical)
                     .lineLimit(1...3)
+            }
+
+            Button("Add Emergency Contact") {
+                let contact = EmergencyContact(record: record)
+                record.emergencyContacts.append(contact)
+                onChange()
             }
         } header: {
             Label("Emergency Information", systemImage: "cross.case")

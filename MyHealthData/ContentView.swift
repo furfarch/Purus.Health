@@ -9,9 +9,6 @@ import SwiftUI
 import SwiftData
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: \MedicalRecord.updatedAt, order: .reverse) private var records: [MedicalRecord]
-
     var body: some View {
         RecordListView()
     }

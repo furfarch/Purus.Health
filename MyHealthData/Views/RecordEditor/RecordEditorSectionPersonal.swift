@@ -8,26 +8,20 @@ struct RecordEditorSectionPersonal: View {
     var body: some View {
         if record.isPet {
             Section {
-                // Use existing persisted fields to store pet info to avoid migration issues.
-                // personalNickName will serve as pet name.
-                TextField("Name", text: $record.personalNickName)
-                // Use personalSocialSecurityNumber as Animal ID (ANIS) storage for now.
-                TextField("Animal ID (ANIS)", text: $record.personalSocialSecurityNumber)
-                // Map owner info onto existing fields to avoid schema changes:
-                // owner name -> personalFamilyName
-                TextField("Owner Name", text: $record.personalFamilyName)
-                // owner phone -> personalHealthInsuranceNumber
-                TextField("Owner Phone", text: $record.personalHealthInsuranceNumber)
-                // owner email -> emergencyEmail (legacy field)
-                TextField("Owner Email", text: $record.emergencyEmail)
+                // Use dedicated pet fields in the model
+                TextField("Name", text: $record.personalName)
+                TextField("Animal ID (ANIS)", text: $record.personalAnimalID)
+                TextField("Owner Name", text: $record.ownerName)
+                TextField("Owner Phone", text: $record.ownerPhone)
+                TextField("Owner Email", text: $record.ownerEmail)
             } header: {
                 Label("Pet Information", systemImage: "pawprint")
             }
-            .onChange(of: record.personalNickName) { _, _ in onChange() }
-            .onChange(of: record.personalSocialSecurityNumber) { _, _ in onChange() }
-            .onChange(of: record.personalFamilyName) { _, _ in onChange() }
-            .onChange(of: record.personalHealthInsuranceNumber) { _, _ in onChange() }
-            .onChange(of: record.emergencyEmail) { _, _ in onChange() }
+            .onChange(of: record.personalName) { _, _ in onChange() }
+            .onChange(of: record.personalAnimalID) { _, _ in onChange() }
+            .onChange(of: record.ownerName) { _, _ in onChange() }
+            .onChange(of: record.ownerPhone) { _, _ in onChange() }
+            .onChange(of: record.ownerEmail) { _, _ in onChange() }
         } else {
             Section {
                 TextField("Family Name", text: $record.personalFamilyName)

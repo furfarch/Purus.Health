@@ -3,13 +3,13 @@ import SwiftData
 
 @Model
 final class MedicalDocumentEntry {
-    var date: Date?
-    var name: String
+    var date: Date? = nil
+    var name: String = ""
 
     /// Note only. No links, no attachments, no stored-file references.
-    var note: String
+    var note: String = ""
 
-    var record: MedicalRecord?
+    var record: MedicalRecord? = nil
 
     init(date: Date? = nil, name: String = "", note: String = "", record: MedicalRecord? = nil) {
         self.date = date

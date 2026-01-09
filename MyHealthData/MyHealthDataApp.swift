@@ -10,11 +10,10 @@ import SwiftData
 
 @main
 struct MyHealthDataApp: App {
-    var body: some Scene {
-        WindowGroup {
-            ContentView()
-        }
-        .modelContainer(for: [
+    private let modelContainer: ModelContainer
+
+    init() {
+        let schema = Schema([
             MedicalRecord.self,
             BloodEntry.self,
             DrugEntry.self,
@@ -27,5 +26,33 @@ struct MyHealthDataApp: App {
             EmergencyContact.self,
             WeightEntry.self
         ])
+
+        // Force a purely local store. This avoids Core Data's CloudKit validation rules
+        // from preventing the app from launching while the schema is still evolving.
+        // (You can re-enable CloudKit later with a dedicated migration pass.)
+        let localConfig = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: false,
+            cloudKitDatabase: .none
+        )
+
+        do {
+            self.modelContainer = try ModelContainer(for: schema, configurations: [localConfig])
+        } catch {
+            // Development-friendly fallback: run with an in-memory store if the on-disk store is incompatible.
+            let memoryConfig = ModelConfiguration(
+                schema: schema,
+                isStoredInMemoryOnly: true,
+                cloudKitDatabase: .none
+            )
+            self.modelContainer = try! ModelContainer(for: schema, configurations: [memoryConfig])
+        }
+    }
+
+    var body: some Scene {
+        WindowGroup {
+            ContentView()
+        }
+        .modelContainer(modelContainer)
     }
 }

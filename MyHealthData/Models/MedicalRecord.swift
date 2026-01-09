@@ -8,6 +8,8 @@ final class MedicalRecord {
 
     // Local stable identifier (avoid using 'id' which conflicts with SwiftData synthesized id)
     var uuid: String
+    // Conform to Identifiable for use with SwiftUI APIs that require it.
+    var id: String { uuid }
 
     // Personal Information (human)
     var personalFamilyName: String
@@ -36,38 +38,38 @@ final class MedicalRecord {
 
     // Relationships (existing ones)
     @Relationship(deleteRule: .cascade, inverse: \BloodEntry.record)
-    var blood: [BloodEntry]
+    var blood: [BloodEntry] = []
 
     @Relationship(deleteRule: .cascade, inverse: \DrugEntry.record)
-    var drugs: [DrugEntry]
+    var drugs: [DrugEntry] = []
 
     @Relationship(deleteRule: .cascade, inverse: \VaccinationEntry.record)
-    var vaccinations: [VaccinationEntry]
+    var vaccinations: [VaccinationEntry] = []
 
     @Relationship(deleteRule: .cascade, inverse: \AllergyEntry.record)
-    var allergy: [AllergyEntry]
+    var allergy: [AllergyEntry] = []
 
     @Relationship(deleteRule: .cascade, inverse: \IllnessEntry.record)
-    var illness: [IllnessEntry]
+    var illness: [IllnessEntry] = []
 
     @Relationship(deleteRule: .cascade, inverse: \RiskEntry.record)
-    var risks: [RiskEntry]
+    var risks: [RiskEntry] = []
 
     @Relationship(deleteRule: .cascade, inverse: \MedicalHistoryEntry.record)
-    var medicalhistory: [MedicalHistoryEntry]
+    var medicalhistory: [MedicalHistoryEntry] = []
 
     @Relationship(deleteRule: .cascade, inverse: \MedicalDocumentEntry.record)
-    var medicaldocument: [MedicalDocumentEntry]
+    var medicaldocument: [MedicalDocumentEntry] = []
 
     @Relationship(deleteRule: .cascade, inverse: \WeightEntry.record)
-    var weights: [WeightEntry]
+    var weights: [WeightEntry] = []
 
     @Relationship(deleteRule: .cascade, inverse: \EmergencyContact.record)
-    var emergencyContacts: [EmergencyContact]
+    var emergencyContacts: [EmergencyContact] = []
 
     // CloudKit integration flags (opt-in per-record)
-    var isCloudEnabled: Bool
-    var cloudRecordName: String?
+    var isCloudEnabled: Bool = false
+    var cloudRecordName: String? = nil
 
     init(
         uuid: String = UUID().uuidString,

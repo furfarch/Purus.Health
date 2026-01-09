@@ -3,11 +3,11 @@ import SwiftData
 
 @Model
 final class IllnessEntry {
-    var date: Date?
-    var name: String
-    var informationOrComment: String
+    var date: Date? = nil
+    var name: String = ""
+    var informationOrComment: String = ""
 
-    var record: MedicalRecord?
+    var record: MedicalRecord? = nil
 
     init(date: Date? = nil, name: String = "", informationOrComment: String = "", record: MedicalRecord? = nil) {
         self.date = date

@@ -8,6 +8,9 @@ struct RecordListView: View {
     @State private var activeRecord: MedicalRecord? = nil
     @State private var showEditor: Bool = false
     @State private var startEditing: Bool = false
+    @State private var showAbout: Bool = false
+    @State private var showSettings: Bool = false
+    @State private var saveErrorMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -19,10 +22,7 @@ struct RecordListView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .center)
                 } else {
-                    let humanRecords = records.filter { !$0.isPet }
-                    let petRecords = records.filter { $0.isPet }
-
-                    ForEach(humanRecords, id: \.createdAt) { record in
+                    ForEach(records, id: \.createdAt) { record in
                         Button(action: {
                             activeRecord = record
                             startEditing = false
@@ -39,30 +39,25 @@ struct RecordListView: View {
                             }
                         }
                     }
-                    .onDelete(perform: deleteHumanRecords)
-
-                    ForEach(petRecords, id: \.createdAt) { record in
-                        Button(action: {
-                            activeRecord = record
-                            startEditing = false
-                            showEditor = true
-                        }) {
-                            HStack {
-                                Image(systemName: record.isPet ? "cat" : "person")
-                                VStack(alignment: .leading) {
-                                    Text(displayName(for: record)).font(.headline)
-                                    Text(record.updatedAt, style: .date)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                    }
-                    .onDelete(perform: deletePetRecords)
+                    .onDelete(perform: deleteRecords)
                 }
             }
             .navigationTitle("MyHealthData")
             .toolbar {
+                ToolbarItemGroup(placement: .topBarLeading) {
+                    Button {
+                        showAbout = true
+                    } label: {
+                        Image(systemName: "info.circle")
+                    }
+
+                    Button {
+                        showSettings = true
+                    } label: {
+                        Image(systemName: "gear")
+                    }
+                }
+
                 ToolbarItemGroup(placement: .primaryAction) {
                     Menu {
                         Button {
@@ -81,14 +76,17 @@ struct RecordListView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showEditor) {
-                if let record = activeRecord {
-                    NavigationStack {
-                        RecordEditorView(record: record, startEditing: startEditing)
-                    }
-                } else {
-                    EmptyView()
+            .sheet(item: $activeRecord, onDismiss: { activeRecord = nil }) { record in
+                NavigationStack {
+                    RecordEditorView(record: record, startEditing: startEditing)
                 }
+            }
+            .sheet(isPresented: $showAbout) { AboutView() }
+            .sheet(isPresented: $showSettings) { SettingsView() }
+            .alert("Save Error", isPresented: Binding(get: { saveErrorMessage != nil }, set: { if !$0 { saveErrorMessage = nil } })) {
+                Button("OK", role: .cancel) { saveErrorMessage = nil }
+            } message: {
+                Text(saveErrorMessage ?? "Unknown error")
             }
         }
     }
@@ -105,27 +103,25 @@ struct RecordListView: View {
 
         modelContext.insert(record)
         // Persist immediately so the query observes the change.
-        do { try modelContext.save() } catch { /* intentionally silent */ }
+        Task { @MainActor in
+            do { try modelContext.save() }
+            catch { saveErrorMessage = "Save failed: \(error.localizedDescription)" }
+        }
 
         activeRecord = record
         startEditing = true
         showEditor = true
     }
 
-    private func deleteHumanRecords(at offsets: IndexSet) {
+    private func deleteRecords(at offsets: IndexSet) {
         for index in offsets {
-            let record = records.filter { !$0.isPet }[index]
+            let record = records[index]
             modelContext.delete(record)
         }
-        do { try modelContext.save() } catch { /* intentionally silent */ }
-    }
-
-    private func deletePetRecords(at offsets: IndexSet) {
-        for index in offsets {
-            let record = records.filter { $0.isPet }[index]
-            modelContext.delete(record)
+        Task { @MainActor in
+            do { try modelContext.save() }
+            catch { saveErrorMessage = "Delete failed: \(error.localizedDescription)" }
         }
-        do { try modelContext.save() } catch { /* intentionally silent */ }
     }
 
     private func displayName(for record: MedicalRecord) -> String {

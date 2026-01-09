@@ -3,11 +3,11 @@ import SwiftData
 
 @Model
 final class BloodEntry {
-    var date: Date?
-    var name: String
-    var comment: String
+    var date: Date? = nil
+    var name: String = ""
+    var comment: String = ""
 
-    var record: MedicalRecord?
+    var record: MedicalRecord? = nil
 
     init(date: Date? = nil, name: String = "", comment: String = "", record: MedicalRecord? = nil) {
         self.date = date

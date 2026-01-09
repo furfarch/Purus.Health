@@ -13,6 +13,8 @@ struct RecordEditorView: View {
     @State private var exportErrorMessage: String?
     @State private var exportURL: URL?
 
+    @State private var saveErrorMessage: String?
+
     @Environment(\.dismiss) private var dismiss
 
     /// Allow callers to request that the editor starts in editing mode.
@@ -36,46 +38,18 @@ struct RecordEditorView: View {
             document: exportURL.map { ExportFileDocument(fileURL: $0) },
             contentType: .data,
             defaultFilename: exportURL?.lastPathComponent ?? "export"
-        ) { _ in
-            // handled by system
+        ) { _ in }
+        .alert("Save Error", isPresented: Binding(get: { saveErrorMessage != nil }, set: { if !$0 { saveErrorMessage = nil } })) {
+            Button("OK", role: .cancel) { saveErrorMessage = nil }
+        } message: {
+            Text(saveErrorMessage ?? "Unknown error")
         }
     }
 
     private var editList: some View {
         List {
-            Section {
-                Toggle(isOn: $record.isCloudEnabled) {
-                    Text("Sync to iCloud")
-                }
-                .onChange(of: record.isCloudEnabled) { newValue in
-                    if newValue {
-                        // Present a small confirmation for human records only
-                        if !record.isPet {
-                            // Minimal disclaimer - user-facing; no logging
-                            Task { @MainActor in
-                                // show an alert by setting exportErrorMessage temporarily
-                                exportErrorMessage = "Enabling iCloud will upload this human medical record to iCloud and may be shared with invitees."
-                                try? await Task.sleep(nanoseconds: 2_000_000_000)
-                                exportErrorMessage = nil
-                            }
-                        }
-                        // Trigger a background upload attempt (best-effort)
-                        Task { @MainActor in
-                            do {
-                                _ = try await CloudKitManager.shared.upload(record: record)
-                                // persist recorded cloudRecordName
-                                record.cloudRecordName = record.cloudRecordName ?? record.id
-                                try? modelContext.save()
-                            } catch {
-                                // silently ignore - UI will not crash
-                            }
-                        }
-                    }
-                }
-            }
-            
             RecordEditorSectionPersonal(record: record, onChange: touch)
-            RecordEditorSectionEmergency(record: record, onChange: touch)
+            RecordEditorSectionEmergency(modelContext: modelContext, record: record, onChange: touch)
 
             RecordEditorSectionBlood(modelContext: modelContext, record: record, onChange: touch)
             RecordEditorSectionDrugs(modelContext: modelContext, record: record, onChange: touch)
@@ -287,19 +261,17 @@ struct RecordEditorView: View {
                 if isEditing {
                     // Finish editing: update timestamp and persist changes.
                     record.updatedAt = Date()
-                    do {
-                        try modelContext.save()
-                    } catch {
-                        // intentionally silent (no logging)
+                    Task { @MainActor in
+                        do {
+                            try modelContext.save()
+                            // Saved successfully: leave edit mode and dismiss sheet
+                            isEditing = false
+                            dismiss()
+                        } catch {
+                            // Show a visible alert so the user knows saving failed
+                            saveErrorMessage = "Save failed: \(error.localizedDescription)"
+                        }
                     }
-                    // If presented as a sheet, dismiss after saving; otherwise return to view mode.
-                    // Attempt to persist changes (silent on failure) then dismiss/pop the view.
-                    do {
-                        try modelContext.save()
-                    } catch {
-                        // intentionally silent (no logging)
-                    }
-                    dismiss()
                  } else {
                      // Enter editing mode
                      isEditing = true
