@@ -117,6 +117,7 @@ final class CloudSyncService {
     // MARK: - UICloudSharingController Integration
 
     private var activeSharingDelegate: CloudSharingDelegate? // retain delegate while sheet is presented
+    private var sharingTimeoutTask: Task<Void, Never>? = nil
 
     func makeCloudSharingController(for record: MedicalRecord, onComplete: @escaping (Result<URL?, Error>) -> Void) async throws -> UICloudSharingController {
         let recordName = record.cloudRecordName ?? record.uuid
@@ -126,98 +127,63 @@ final class CloudSyncService {
         // Check account status early
         let status = try await container.accountStatus()
         guard status == .available else {
-            throw NSError(domain: "CloudSyncService", code: 3, userInfo: [NSLocalizedDescriptionKey: "iCloud account not available (status: \(status)). Please sign in to iCloud."])
+            let err = NSError(domain: "CloudSyncService", code: 3, userInfo: [NSLocalizedDescriptionKey: "iCloud account not available (status: \(status)). Please sign in to iCloud."])
+            ShareDebugStore.shared.appendLog("makeCloudSharingController: account not available: \(status)")
+            throw err
         }
 
         // Ensure record exists in CloudKit
         try await syncIfNeeded(record: record)
 
-        // Fetch the root record from CloudKit
-        let root = try await database.record(for: rootID)
-        let share = CKShare(rootRecord: root)
-        share[CKShare.SystemFieldKey.title] = "Shared Medical Record" as CKRecordValue
-
-        let modify = CKModifyRecordsOperation(recordsToSave: [root, share], recordIDsToDelete: nil)
-        modify.savePolicy = .changedKeys
-
-        // Save the share to CloudKit
+        // Fetch the root record from CloudKit (fresh copy)
+        let root: CKRecord
         do {
-            try await withCheckedThrowingContinuation { [unowned self] cont in
-                modify.modifyRecordsResultBlock = { result in
-                    switch result {
-                    case .success:
-                        print("[CloudSyncService] Saved CKShare to CloudKit for record=\(record.uuid)")
-                        // Debug store
-                        #if DEBUG
-                        ShareDebugStore.shared.appendLog("Saved CKShare to CloudKit for record=\(record.uuid)")
-                        #endif
-                        cont.resume(returning: ())
-                    case .failure(let error):
-                        print("[CloudSyncService] Failed saving CKShare: \(error)")
-                        #if DEBUG
-                        ShareDebugStore.shared.appendLog("Failed saving CKShare: \(error)")
-                        ShareDebugStore.shared.lastError = error
-                        #endif
-                        cont.resume(throwing: error)
-                    }
-                }
-                self.database.add(modify)
-            }
+            root = try await database.record(for: rootID)
+            ShareDebugStore.shared.appendLog("makeCloudSharingController: fetched root record id=\(root.recordID.recordName) for record=\(record.uuid)")
         } catch {
+            ShareDebugStore.shared.appendLog("makeCloudSharingController: failed fetching root record: \(error)")
             throw enrichCloudKitError(error)
         }
 
-        // Try to fetch the saved CKShare to ensure the URL and server-side data are available.
-        let fetchedShare: CKShare
-        do {
-            let rec = try await database.record(for: share.recordID)
-            guard let s = rec as? CKShare else {
-                throw NSError(domain: "CloudSyncService", code: 4, userInfo: [NSLocalizedDescriptionKey: "Saved share couldn't be fetched as CKShare."])
-            }
-            fetchedShare = s
-            print("[CloudSyncService] Fetched share URL: \(String(describing: fetchedShare.url))")
-            #if DEBUG
-            ShareDebugStore.shared.appendLog("Fetched CKShare. url=\(String(describing: fetchedShare.url))")
-            ShareDebugStore.shared.lastShareURL = fetchedShare.url
-            #endif
-        } catch {
-            // Not fatal: we'll still present the controller, but log and enrich the error for UI.
-            print("[CloudSyncService] Warning: failed to fetch saved CKShare: \(error)")
-            #if DEBUG
-            ShareDebugStore.shared.appendLog("Warning: failed to fetch saved CKShare: \(error)")
-            ShareDebugStore.shared.lastError = error
-            #endif
-            // continue, but pass through a warning to caller via onComplete when controller is used
-            // (the CloudSharingDelegate will report final status)
-            fetchedShare = share
-        }
-
+        // Create delegate and retain it while controller is presented
         let delegate = CloudSharingDelegate()
-        // retain delegate so it lives while the sheet is presented
         self.activeSharingDelegate = delegate
         delegate.onComplete = { [weak self] result in
-            // forward to caller
             onComplete(result)
-            // populate debug store for visibility
-            #if DEBUG
-            switch result {
-            case .success(let url):
-                ShareDebugStore.shared.appendLog("CloudSharingDelegate success, url=\(String(describing: url))")
-                ShareDebugStore.shared.lastShareURL = url
-            case .failure(let err):
-                ShareDebugStore.shared.appendLog("CloudSharingDelegate failed: \(err)")
-                ShareDebugStore.shared.lastError = err
-            }
-            #endif
-            // release retained delegate after completion
-            DispatchQueue.main.async {
-                self?.activeSharingDelegate = nil
+            DispatchQueue.main.async { self?.activeSharingDelegate = nil }
+        }
+
+        // Use the preparation-handler initializer — UI will show its own progress UI and call our handler to produce the share
+        let controller = UICloudSharingController { controller, preparationCompletion in
+            // The system asked us to prepare a CKShare. Do this asynchronously.
+            Task {
+                do {
+                    // Ensure root is up-to-date on server
+                    _ = try await database.save(root)
+                    ShareDebugStore.shared.appendLog("preparation: saved root record id=\(root.recordID.recordName)")
+
+                    // Create and save the share on the server
+                    let share = CKShare(rootRecord: root)
+                    share[CKShare.SystemFieldKey.title] = "Shared Medical Record" as CKRecordValue
+                    let saved = try await database.save(share)
+                    ShareDebugStore.shared.appendLog("preparation: saved CKShare id=\(saved.recordID.recordName)")
+
+                    // Return the saved share and container to the UI controller
+                    DispatchQueue.main.async {
+                        preparationCompletion(saved as? CKShare, container, nil)
+                        ShareDebugStore.shared.appendLog("preparation: completion called with share id=\(saved.recordID.recordName)")
+                    }
+                } catch {
+                    ShareDebugStore.shared.appendLog("preparation: failed to create share: \(error)")
+                    DispatchQueue.main.async {
+                        preparationCompletion(nil, container, error)
+                    }
+                }
             }
         }
 
-        let controller = UICloudSharingController(share: fetchedShare, container: container)
-        controller.availablePermissions = [.allowReadWrite, .allowPrivate]
         controller.delegate = delegate
+        controller.availablePermissions = [.allowReadWrite, .allowPrivate]
         controller.modalPresentationStyle = .formSheet
         controller.title = "Shared Medical Record"
         return controller
