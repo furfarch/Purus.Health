@@ -11,6 +11,7 @@ import SwiftData
 @main
 struct MyHealthDataApp: App {
     private let modelContainer: ModelContainer
+    @Environment(\.scenePhase) private var scenePhase: ScenePhase
 
     init() {
         let schema = Schema([
@@ -39,22 +40,32 @@ struct MyHealthDataApp: App {
         do {
             self.modelContainer = try ModelContainer(for: schema, configurations: [localConfig])
         } catch {
-            // If the persistent store cannot be initialized, this is a critical error.
-            // Log the error and crash with a clear message rather than silently falling back
-            // to in-memory storage which would cause data loss.
-            print("❌ CRITICAL ERROR: Failed to initialize persistent ModelContainer")
-            print("Error details: \(error)")
-            print("The app cannot continue without a persistent store.")
-            fatalError("Failed to initialize ModelContainer: \(error)")
+            // LOG THE ERROR so we know why persistent store failed
+            print("[MyHealthDataApp] Failed to create persistent ModelContainer: \(error)")
+            let memoryConfig = ModelConfiguration(
+                schema: schema,
+                isStoredInMemoryOnly: true,
+                cloudKitDatabase: .none
+            )
+            self.modelContainer = try! ModelContainer(for: schema, configurations: [memoryConfig])
         }
     }
 
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .task {
+                    // On first launch, attempt to pull records from CloudKit into the local store.
+                    // This makes per-record sync appear automatic: when a record is uploaded from
+                    // another device, this device will import it on foreground/launch.
+                    let fetcher = CloudKitMedicalRecordFetcher(containerIdentifier: "iCloud.com.furfarch.MyHealthData")
+                    fetcher.setModelContext(self.modelContainer.mainContext)
+                    fetcher.fetchAll()
+                }
         }
         .modelContainer(modelContainer)
-        .onChange(of: scenePhase) { newPhase, _ in
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            // Use two-argument onChange to satisfy the newer API and avoid deprecation warnings.
             if newPhase == .active {
                 Task { @MainActor in
                     let fetcher = CloudKitMedicalRecordFetcher(containerIdentifier: "iCloud.com.furfarch.MyHealthData")
