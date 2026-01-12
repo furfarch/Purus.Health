@@ -12,23 +12,10 @@ struct RecordListView: View {
     @State private var showSettings: Bool = false
     @State private var saveErrorMessage: String?
 
-    #if os(macOS)
-    @State private var selection = Set<PersistentIdentifier>()
-    #endif
-
     var body: some View {
         NavigationStack {
-            Group {
-                #if os(macOS)
-                List(selection: $selection) {
-                    listContent
-                }
-                .onDeleteCommand { deleteSelectedRecords() }
-                #else
-                List {
-                    listContent
-                }
-                #endif
+            List {
+                listContent
             }
             .navigationTitle("MyHealthData")
             .toolbar {
@@ -49,6 +36,11 @@ struct RecordListView: View {
                     }
                 }
 
+                // Enables the standard iOS delete UI (and also works for iPad-on-Mac where swipe can be awkward).
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    EditButton()
+                }
+
                 ToolbarItemGroup(placement: .primaryAction) {
                     Menu {
                         Button {
@@ -67,7 +59,7 @@ struct RecordListView: View {
                     }
                 }
                 #else
-                // macOS: use automatic placements so toolbar items render in the mac toolbar
+                // macOS build (if you ever add a real macOS target later).
                 ToolbarItem(placement: .automatic) {
                     Button {
                         showAbout = true
@@ -129,11 +121,7 @@ struct RecordListView: View {
         } else {
             ForEach(records, id: \.persistentModelID) { record in
                 row(for: record)
-                    #if os(macOS)
-                    .tag(record.persistentModelID)
-                    #endif
             }
-            // iOS swipe-to-delete hooks into this.
             .onDelete(perform: deleteRecords)
         }
     }
@@ -162,7 +150,6 @@ struct RecordListView: View {
             startEditing = false
             showEditor = true
         }
-        // Keep a mac/right-click delete option too.
         .contextMenu {
             Button(role: .destructive) {
                 deleteRecords(with: [record])
@@ -221,24 +208,11 @@ struct RecordListView: View {
             do {
                 try await CloudSyncService.shared.deleteCloudRecord(for: record)
             } catch {
-                // record cloud delete failed; surface error but continue with local deletion
                 saveErrorMessage = "Cloud delete failed: \(error.localizedDescription)"
             }
         }
         modelContext.delete(record)
-
-        #if os(macOS)
-        selection.remove(record.persistentModelID)
-        #endif
     }
-
-    #if os(macOS)
-    private func deleteSelectedRecords() {
-        let selectedRecords = records.filter { selection.contains($0.persistentModelID) }
-        guard !selectedRecords.isEmpty else { return }
-        deleteRecords(with: selectedRecords)
-    }
-    #endif
 
     private func displayName(for record: MedicalRecord) -> String {
         if record.isPet {
