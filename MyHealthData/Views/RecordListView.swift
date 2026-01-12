@@ -30,12 +30,20 @@ struct RecordListView: View {
                         }) {
                             HStack {
                                 Image(systemName: record.isPet ? "cat" : "person")
+
                                 VStack(alignment: .leading) {
                                     Text(displayName(for: record)).font(.headline)
                                     Text(record.updatedAt, style: .date)
                                         .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
+
+                                Spacer(minLength: 8)
+
+                                Image(systemName: record.locationStatus.systemImageName)
+                                    .foregroundStyle(record.locationStatus.color)
+                                    .accessibilityLabel(record.locationStatus.accessibilityLabel)
+                                    .accessibilityIdentifier("recordLocationStatusIcon")
                             }
                         }
                     }
@@ -115,17 +123,9 @@ struct RecordListView: View {
                 }
                 #endif
             }
-            .sheet(item: $activeRecord, onDismiss: {
-                activeRecord = nil
-                startEditing = false
-            }) { record in
+            .sheet(item: $activeRecord, onDismiss: { activeRecord = nil }) { record in
                 NavigationStack {
                     RecordEditorView(record: record, startEditing: startEditing)
-                        .onAppear {
-                            // If we opened because of a newly-created record, clear the flag so subsequent opens
-                            // don’t get stuck in edit mode or race with other state updates.
-                            if startEditing { startEditing = false }
-                        }
                 }
             }
             .sheet(isPresented: $showAbout) { AboutView() }

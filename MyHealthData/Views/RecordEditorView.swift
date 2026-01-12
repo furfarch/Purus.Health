@@ -37,8 +37,10 @@ struct RecordEditorView: View {
                         .font(.headline)
                         .lineLimit(1)
 
-                    Image(systemName: record.isCloudEnabled ? (record.isSharingEnabled ? "person.2.circle" : "icloud") : "iphone")
-                        .foregroundStyle(record.isCloudEnabled ? (record.isSharingEnabled ? .green : .blue) : .secondary)
+                    Image(systemName: record.locationStatus.systemImageName)
+                        .foregroundStyle(record.locationStatus.color)
+                        .accessibilityLabel(record.locationStatus.accessibilityLabel)
+                        .accessibilityIdentifier("recordLocationStatusIcon")
                 }
             }
 

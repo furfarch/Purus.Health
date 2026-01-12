@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import SwiftUI
 
 @Model
 final class MedicalRecord {
@@ -71,8 +72,8 @@ final class MedicalRecord {
     var isCloudEnabled: Bool = false
     var cloudRecordName: String? = nil
 
-    /// Persisted recordName of the CKShare that shares this MedicalRecord (best effort).
-    /// Storing this lets us reuse a previously-created share instead of trying to recreate/fetch it in a racy way.
+    /// If non-nil, this record has an associated CKShare stored in the same zone as the root record.
+    /// We keep just the recordName so we can fetch/reuse the share later.
     var cloudShareRecordName: String? = nil
 
     /// Per-record sharing toggle.
@@ -82,6 +83,48 @@ final class MedicalRecord {
     /// Optional display string for participants (UI-only, best effort).
     /// For now this may remain empty; we'll populate it later when we add participant fetching.
     var shareParticipantsSummary: String = ""
+
+    enum RecordLocationStatus: Equatable {
+        case local
+        case iCloud
+        case shared
+
+        var systemImageName: String {
+            switch self {
+            case .local: return "iphone"
+            case .iCloud: return "icloud"
+            case .shared: return "person.2.circle"
+            }
+        }
+
+        var color: Color {
+            switch self {
+            case .local: return .secondary
+            case .iCloud: return .blue
+            case .shared: return .green
+            }
+        }
+
+        var accessibilityLabel: String {
+            switch self {
+            case .local: return "Local record"
+            case .iCloud: return "iCloud record"
+            case .shared: return "Shared record"
+            }
+        }
+    }
+
+    /// Centralized rule for what the UI should show.
+    /// Priority: Shared > iCloud > Local.
+    var locationStatus: RecordLocationStatus {
+        if isCloudEnabled {
+            if isSharingEnabled || cloudShareRecordName != nil {
+                return .shared
+            }
+            return .iCloud
+        }
+        return .local
+    }
 
     init(
         uuid: String = UUID().uuidString,
