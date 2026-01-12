@@ -12,43 +12,23 @@ struct RecordListView: View {
     @State private var showSettings: Bool = false
     @State private var saveErrorMessage: String?
 
+    #if os(macOS)
+    @State private var selection = Set<PersistentIdentifier>()
+    #endif
+
     var body: some View {
         NavigationStack {
-            List {
-                if records.isEmpty {
-                    VStack(alignment: .center) {
-                        Text("No records yet")
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .center)
-                } else {
-                    ForEach(records, id: \.createdAt) { record in
-                        Button(action: {
-                            activeRecord = record
-                            startEditing = false
-                            showEditor = true
-                        }) {
-                            HStack {
-                                Image(systemName: record.isPet ? "cat" : "person")
-
-                                VStack(alignment: .leading) {
-                                    Text(displayName(for: record)).font(.headline)
-                                    Text(record.updatedAt, style: .date)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-
-                                Spacer(minLength: 8)
-
-                                Image(systemName: record.locationStatus.systemImageName)
-                                    .foregroundStyle(record.locationStatus.color)
-                                    .accessibilityLabel(record.locationStatus.accessibilityLabel)
-                                    .accessibilityIdentifier("recordLocationStatusIcon")
-                            }
-                        }
-                    }
-                    .onDelete(perform: deleteRecords)
+            Group {
+                #if os(macOS)
+                List(selection: $selection) {
+                    listContent
                 }
+                .onDeleteCommand { deleteSelectedRecords() }
+                #else
+                List {
+                    listContent
+                }
+                #endif
             }
             .navigationTitle("MyHealthData")
             .toolbar {
@@ -138,6 +118,60 @@ struct RecordListView: View {
         }
     }
 
+    @ViewBuilder
+    private var listContent: some View {
+        if records.isEmpty {
+            VStack(alignment: .center) {
+                Text("No records yet")
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+        } else {
+            ForEach(records, id: \.persistentModelID) { record in
+                row(for: record)
+                    #if os(macOS)
+                    .tag(record.persistentModelID)
+                    #endif
+            }
+            // iOS swipe-to-delete hooks into this.
+            .onDelete(perform: deleteRecords)
+        }
+    }
+
+    private func row(for record: MedicalRecord) -> some View {
+        HStack {
+            Image(systemName: record.isPet ? "cat" : "person")
+
+            VStack(alignment: .leading) {
+                Text(displayName(for: record)).font(.headline)
+                Text(record.updatedAt, style: .date)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 8)
+
+            Image(systemName: record.locationStatus.systemImageName)
+                .foregroundStyle(record.locationStatus.color)
+                .accessibilityLabel(record.locationStatus.accessibilityLabel)
+                .accessibilityIdentifier("recordLocationStatusIcon")
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            activeRecord = record
+            startEditing = false
+            showEditor = true
+        }
+        // Keep a mac/right-click delete option too.
+        .contextMenu {
+            Button(role: .destructive) {
+                deleteRecords(with: [record])
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+    }
+
     private func addRecord(isPet: Bool) {
         let record = MedicalRecord()
         record.isPet = isPet
@@ -162,23 +196,49 @@ struct RecordListView: View {
 
     private func deleteRecords(at offsets: IndexSet) {
         Task { @MainActor in
-            // delete in reverse index order
             for index in offsets.sorted(by: >) {
                 let record = records[index]
-                if record.isCloudEnabled {
-                    do {
-                        try await CloudSyncService.shared.deleteCloudRecord(for: record)
-                    } catch {
-                        // record cloud delete failed; surface error but continue with local deletion
-                        saveErrorMessage = "Cloud delete failed: \(error.localizedDescription)"
-                    }
-                }
-                modelContext.delete(record)
+                await deleteRecord(record)
             }
             do { try modelContext.save() }
             catch { saveErrorMessage = "Delete failed: \(error.localizedDescription)" }
         }
     }
+
+    private func deleteRecords(with recordsToDelete: [MedicalRecord]) {
+        Task { @MainActor in
+            for record in recordsToDelete {
+                await deleteRecord(record)
+            }
+            do { try modelContext.save() }
+            catch { saveErrorMessage = "Delete failed: \(error.localizedDescription)" }
+        }
+    }
+
+    @MainActor
+    private func deleteRecord(_ record: MedicalRecord) async {
+        if record.isCloudEnabled {
+            do {
+                try await CloudSyncService.shared.deleteCloudRecord(for: record)
+            } catch {
+                // record cloud delete failed; surface error but continue with local deletion
+                saveErrorMessage = "Cloud delete failed: \(error.localizedDescription)"
+            }
+        }
+        modelContext.delete(record)
+
+        #if os(macOS)
+        selection.remove(record.persistentModelID)
+        #endif
+    }
+
+    #if os(macOS)
+    private func deleteSelectedRecords() {
+        let selectedRecords = records.filter { selection.contains($0.persistentModelID) }
+        guard !selectedRecords.isEmpty else { return }
+        deleteRecords(with: selectedRecords)
+    }
+    #endif
 
     private func displayName(for record: MedicalRecord) -> String {
         if record.isPet {
