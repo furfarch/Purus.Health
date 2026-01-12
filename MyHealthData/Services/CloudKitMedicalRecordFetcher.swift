@@ -52,27 +52,19 @@ class CloudKitMedicalRecordFetcher: ObservableObject {
             DispatchQueue.main.async {
                 self?.isLoading = false
                 switch result {
-                case .success(_):
+                case .success:
                     self?.records = fetched
-                    // Automatic sync/merge into SwiftData (the app's intended automatic behavior)
                     if let context = self?.modelContext {
                         ShareDebugStore.shared.appendLog("CloudKitMedicalRecordFetcher: performing sync/merge of \(fetched.count) records into local store")
                         self?.importToSwiftData(context: context)
                         ShareDebugStore.shared.appendLog("CloudKitMedicalRecordFetcher: sync/merge complete for \(fetched.count) records")
-                    } else {
-                        ShareDebugStore.shared.appendLog("CloudKitMedicalRecordFetcher: no modelContext set, skipping sync/merge to SwiftData")
                     }
                 case .failure(let err):
-                    // If the zone doesn't exist yet, treat it as "no cloud records" instead of a fatal sync error.
                     if let ck = err as? CKError, ck.code == .zoneNotFound {
                         ShareDebugStore.shared.appendLog("CloudKitMedicalRecordFetcher: zone not found (\(self?.shareZoneName ?? "")), treating as empty cloud state")
                         self?.records = []
-                        if let context = self?.modelContext {
-                            self?.importToSwiftData(context: context)
-                        }
                         return
                     }
-
                     self?.error = err
                     ShareDebugStore.shared.appendLog("CloudKitMedicalRecordFetcher: queryResultBlock error: \(err)")
                 }
@@ -91,7 +83,7 @@ class CloudKitMedicalRecordFetcher: ObservableObject {
             op.zoneID = shareZoneID
             var fetched: [CKRecord] = []
 
-            op.recordMatchedBlock = { (recordID, result) in
+            op.recordMatchedBlock = { (_, result) in
                 switch result {
                 case .success(let rec): fetched.append(rec)
                 case .failure(let err): ShareDebugStore.shared.appendLog("CloudKitMedicalRecordFetcher: recordMatchedBlock error: \(err)")
@@ -102,27 +94,21 @@ class CloudKitMedicalRecordFetcher: ObservableObject {
                 DispatchQueue.main.async {
                     self?.isLoading = false
                     switch result {
-                    case .success(_):
+                    case .success:
                         self?.records = fetched
                         if let context = self?.modelContext {
                             ShareDebugStore.shared.appendLog("CloudKitMedicalRecordFetcher: (async) performing sync/merge of \(fetched.count) records into local store")
                             self?.importToSwiftData(context: context)
                             ShareDebugStore.shared.appendLog("CloudKitMedicalRecordFetcher: (async) sync/merge complete for \(fetched.count) records")
-                        } else {
-                            ShareDebugStore.shared.appendLog("CloudKitMedicalRecordFetcher: (async) no modelContext set, skipping sync/merge to SwiftData")
                         }
                         continuation.resume(returning: fetched.count)
                     case .failure(let err):
                         if let ck = err as? CKError, ck.code == .zoneNotFound {
                             ShareDebugStore.shared.appendLog("CloudKitMedicalRecordFetcher: (async) zone not found (\(self?.shareZoneName ?? "")), treating as empty cloud state")
                             self?.records = []
-                            if let context = self?.modelContext {
-                                self?.importToSwiftData(context: context)
-                            }
                             continuation.resume(returning: 0)
                             return
                         }
-
                         self?.error = err
                         ShareDebugStore.shared.appendLog("CloudKitMedicalRecordFetcher: (async) queryResultBlock error: \(err)")
                         continuation.resume(throwing: err)
@@ -136,18 +122,24 @@ class CloudKitMedicalRecordFetcher: ObservableObject {
 
     /// Import fetched CKRecords into the local SwiftData store as MedicalRecord objects.
     func importToSwiftData(context: ModelContext) {
-        // Build set of UUIDs present in CloudKit
-        let cloudUUIDs: Set<String> = Set(records.compactMap { $0["uuid"] as? String })
-
         for ckRecord in records {
             guard let uuid = ckRecord["uuid"] as? String else { continue }
-            // Try to find an existing record by uuid
+
+            let cloudUpdatedAt = (ckRecord["updatedAt"] as? Date) ?? Date.distantPast
+
             let fetchDescriptor = FetchDescriptor<MedicalRecord>(predicate: #Predicate { $0.uuid == uuid })
             let existing = (try? context.fetch(fetchDescriptor))?.first
+
+            // Prevent stale cloud copies from overwriting newer local edits.
+            if let existing, existing.updatedAt > cloudUpdatedAt {
+                continue
+            }
+
             let record = existing ?? MedicalRecord(uuid: uuid)
-            // Map fields
-            record.createdAt = ckRecord["createdAt"] as? Date ?? Date()
-            record.updatedAt = ckRecord["updatedAt"] as? Date ?? Date()
+
+            record.createdAt = ckRecord["createdAt"] as? Date ?? record.createdAt
+            record.updatedAt = cloudUpdatedAt
+
             record.personalFamilyName = ckRecord["personalFamilyName"] as? String ?? ""
             record.personalGivenName = ckRecord["personalGivenName"] as? String ?? ""
             record.personalNickName = ckRecord["personalNickName"] as? String ?? ""
@@ -158,12 +150,13 @@ class CloudKitMedicalRecordFetcher: ObservableObject {
             record.personalHealthInsurance = ckRecord["personalHealthInsurance"] as? String ?? ""
             record.personalHealthInsuranceNumber = ckRecord["personalHealthInsuranceNumber"] as? String ?? ""
             record.personalEmployer = ckRecord["personalEmployer"] as? String ?? ""
-            // 'isPet' in your model may be Bool or Int; try Bool then Number
+
             if let boolVal = ckRecord["isPet"] as? Bool {
                 record.isPet = boolVal
             } else if let num = ckRecord["isPet"] as? NSNumber {
                 record.isPet = num.boolValue
             }
+
             record.personalName = ckRecord["personalName"] as? String ?? ""
             record.personalAnimalID = ckRecord["personalAnimalID"] as? String ?? ""
             record.ownerName = ckRecord["ownerName"] as? String ?? ""
@@ -173,7 +166,6 @@ class CloudKitMedicalRecordFetcher: ObservableObject {
             record.emergencyNumber = ckRecord["emergencyNumber"] as? String ?? ""
             record.emergencyEmail = ckRecord["emergencyEmail"] as? String ?? ""
 
-            // Mark as cloud-backed
             record.isCloudEnabled = true
             record.cloudRecordName = ckRecord.recordID.recordName
 
@@ -182,18 +174,10 @@ class CloudKitMedicalRecordFetcher: ObservableObject {
             }
         }
 
-        // Persist import/update results.
         do {
             try context.save()
         } catch {
             print("Failed to save CloudKit import: \(error)")
         }
-
-        // NOTE:
-        // We intentionally do NOT attempt to infer remote deletions here.
-        // The previous behavior toggled cloud flags off when a uuid was missing from CloudKit,
-        // which caused records to appear to 'come back' or flip state across launches.
-        // A robust cross-device deletion sync requires an explicit tombstone mechanism.
-        _ = cloudUUIDs
     }
 }

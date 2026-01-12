@@ -276,6 +276,13 @@ struct RecordEditorView: View {
                     Task { @MainActor in
                         do {
                             try modelContext.save()
+
+                            // If this record is cloud-enabled, push the latest edits to CloudKit now.
+                            if record.isCloudEnabled {
+                                try await CloudSyncService.shared.syncIfNeeded(record: record)
+                                try modelContext.save()
+                            }
+
                             // Saved successfully: leave edit mode and dismiss sheet
                             isEditing = false
                             dismiss()
