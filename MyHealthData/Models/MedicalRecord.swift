@@ -126,6 +126,52 @@ final class MedicalRecord {
         return .local
     }
 
+    /// Display name for the record following the pattern: "Family Name - Given Name - Name"
+    /// For pets: uses personalName
+    /// For humans: uses family name, given name, and name (nickname) with " - " separator
+    /// If only name (nickname) is available, uses just that
+    var displayName: String {
+        if isPet {
+            let name = personalName.trimmingCharacters(in: .whitespacesAndNewlines)
+            return name.isEmpty ? "Pet" : name
+        } else {
+            let family = personalFamilyName.trimmingCharacters(in: .whitespacesAndNewlines)
+            let given = personalGivenName.trimmingCharacters(in: .whitespacesAndNewlines)
+            let name = personalNickName.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            // Build the display name with " - " separator
+            let parts = [family, given, name].filter { !$0.isEmpty }
+            
+            if parts.isEmpty {
+                return "Person"
+            }
+            
+            return parts.joined(separator: " - ")
+        }
+    }
+    
+    /// Sort key for ordering records
+    /// Uses the same pattern as displayName: Family Name, Given Name, Name
+    var sortKey: String {
+        if isPet {
+            let name = personalName.trimmingCharacters(in: .whitespacesAndNewlines)
+            return name.isEmpty ? "Pet" : name.lowercased()
+        } else {
+            let family = personalFamilyName.trimmingCharacters(in: .whitespacesAndNewlines)
+            let given = personalGivenName.trimmingCharacters(in: .whitespacesAndNewlines)
+            let name = personalNickName.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            // Build the sort key with consistent ordering
+            let parts = [family, given, name].filter { !$0.isEmpty }
+            
+            if parts.isEmpty {
+                return "person"
+            }
+            
+            return parts.joined(separator: " ").lowercased()
+        }
+    }
+
     init(
         uuid: String = UUID().uuidString,
         createdAt: Date = Date(),
