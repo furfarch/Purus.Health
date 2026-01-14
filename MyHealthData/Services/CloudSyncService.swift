@@ -26,6 +26,7 @@ final class CloudSyncService {
     // Delay to allow server-side processing of share URL (in nanoseconds)
     private let shareURLPopulationDelay: UInt64 = 1_000_000_000 // 1 second
     private let shareURLMaxRetries = 3 // Maximum number of refetch attempts
+    private let nanosecondsPerSecond: Double = 1_000_000_000 // For logging conversion
 
     /// CloudKit record type used for MedicalRecord mirrors.
     /// IMPORTANT:
@@ -257,9 +258,9 @@ final class CloudSyncService {
         // Create new share
         let share = CKShare(rootRecord: root)
         share[CKShare.SystemFieldKey.title] = "Shared Medical Record" as CKRecordValue
-        // Set public permission to allow participants to view/modify
+        // Set restrictive permission - only explicitly invited participants can access
         // This is required for the share URL to be properly generated
-        share.publicPermission = .none  // Only invited participants can access
+        share.publicPermission = .none
 
         do {
             // Use CKModifyRecordsOperation with .allKeys save policy
@@ -267,7 +268,7 @@ final class CloudSyncService {
             // This is critical for establishing the share-root relationship in CloudKit
             ShareDebugStore.shared.appendLog("createShare: saving root=\(root.recordID.recordName) and share=\(share.recordID.recordName) in zone=\(shareZoneName)")
             
-            let (saveResults, _) = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(save: [CKRecord.ID: Result<CKRecord, Error>], delete: [CKRecord.ID: Result<Void, Error>]), Error>) in
+            let (saveResults, _) = try await withCheckedThrowingContinuation { continuation in
                 let operation = CKModifyRecordsOperation(recordsToSave: [root, share], recordIDsToDelete: [])
                 operation.savePolicy = .allKeys  // Force save even if root hasn't changed
                 operation.qualityOfService = .userInitiated
@@ -329,7 +330,7 @@ final class CloudSyncService {
                 var refetchedShare: CKShare?
                 
                 while retryCount < shareURLMaxRetries {
-                    ShareDebugStore.shared.appendLog("createShare: retry attempt \(retryCount + 1)/\(shareURLMaxRetries) after \(Double(currentDelay) / 1_000_000_000)s delay")
+                    ShareDebugStore.shared.appendLog("createShare: retry attempt \(retryCount + 1)/\(shareURLMaxRetries) after \(Double(currentDelay) / nanosecondsPerSecond)s delay")
                     try await Task.sleep(nanoseconds: currentDelay)
                     
                     do {
