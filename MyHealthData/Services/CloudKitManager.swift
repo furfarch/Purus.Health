@@ -84,15 +84,23 @@ final class CloudKitManager {
                     if !recordErrors.isEmpty {
                         let errorDescription = recordErrors.map { "\($0.key.recordName): \($0.value.localizedDescription)" }.joined(separator: ", ")
                         let compositeError = NSError(
-                            domain: "CloudKit",
+                            domain: "CloudKitManager",
                             code: 3,
                             userInfo: [NSLocalizedDescriptionKey: "Failed to save \(recordErrors.count) record(s): \(errorDescription)"]
                         )
                         completion(nil, compositeError)
                     } else {
                         // Extract the saved share from saved records
-                        let savedShare = savedRecords.values.first { $0 is CKShare } as? CKShare
-                        completion(savedShare, nil)
+                        if let savedShare = savedRecords.values.first(where: { $0 is CKShare }) as? CKShare {
+                            completion(savedShare, nil)
+                        } else {
+                            let error = NSError(
+                                domain: "CloudKitManager",
+                                code: 4,
+                                userInfo: [NSLocalizedDescriptionKey: "Share was not returned in save results"]
+                            )
+                            completion(nil, error)
+                        }
                     }
                 case .failure(let opError):
                     completion(nil, opError)
