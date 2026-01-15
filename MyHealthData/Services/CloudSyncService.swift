@@ -27,10 +27,6 @@ final class CloudSyncService {
     private let shareURLPopulationDelay: UInt64 = 1_000_000_000 // 1 second
     private let shareURLMaxRetries = 3 // Maximum number of refetch attempts
     private let nanosecondsPerSecond: Double = 1_000_000_000 // For logging conversion
-    
-    // Sharing constants
-    // Note: `shareTitle` is used by CloudSharingDelegate (must be accessible within module)
-    let shareTitle = "Shared Medical Record"
 
     /// CloudKit record type used for MedicalRecord mirrors.
     /// IMPORTANT:
@@ -263,7 +259,7 @@ final class CloudSyncService {
 
         // Create new share
         let share = CKShare(rootRecord: root)
-        share[CKShare.SystemFieldKey.title] = shareTitle as CKRecordValue
+        share[CKShare.SystemFieldKey.title] = "Shared Medical Record" as CKRecordValue
         // Set restrictive permission - only explicitly invited participants can access
         // This is required for the share URL to be properly generated
         share.publicPermission = .none
@@ -456,66 +452,28 @@ final class CloudSyncService {
 
         // Create delegate and retain it while controller is presented
         let delegate = CloudSharingDelegate()
-        delegate.record = record
         self.activeSharingDelegate = delegate
         delegate.onComplete = { [weak self] result in
             onComplete(result)
             DispatchQueue.main.async { self?.activeSharingDelegate = nil }
         }
 
-        // Check if share already exists
-        if let existingShare = root.share {
-            ShareDebugStore.shared.appendLog("makeCloudSharingController: root has existing share reference id=\(existingShare.recordID.recordName)")
-            do {
-                let shareRecord = try await database.record(for: existingShare.recordID)
-                if let share = shareRecord as? CKShare {
-                    ShareDebugStore.shared.appendLog("makeCloudSharingController: using existing share id=\(share.recordID.recordName) url=\(String(describing: share.url))")
-                    record.cloudShareRecordName = share.recordID.recordName
-                    ShareDebugStore.shared.lastShareURL = share.url
-                    
-                    let controller = UICloudSharingController(share: share, container: container)
-                    controller.delegate = delegate
-                    controller.availablePermissions = [.allowReadWrite, .allowPrivate]
-                    controller.modalPresentationStyle = .formSheet
-                    controller.title = shareTitle
-                    return controller
-                }
-            } catch {
-                ShareDebugStore.shared.appendLog("makeCloudSharingController: failed to fetch existing share: \(error)")
-                // Continue to create new share
-            }
+        let savedShare: CKShare
+        do {
+            savedShare = try await createShare(for: record)
+            ShareDebugStore.shared.appendLog("makeCloudSharingController: obtained CKShare id=\(savedShare.recordID.recordName) zone=\(shareZoneName)")
+        } catch {
+            ShareDebugStore.shared.appendLog("makeCloudSharingController: failed to obtain share: \(error)")
+            throw enrichCloudKitError(error)
         }
-        
-        // Create share manually and use modern UICloudSharingController initializer
-        ShareDebugStore.shared.appendLog("makeCloudSharingController: creating share manually")
-        
-        let share = CKShare(rootRecord: root)
-        share[CKShare.SystemFieldKey.title] = shareTitle as CKRecordValue
-        share.publicPermission = .none
-        
-        // Save both root and share atomically
-        ShareDebugStore.shared.appendLog("makeCloudSharingController: saving root=\(root.recordID.recordName) and share=\(share.recordID.recordName)")
-        
-        let saved = try await database.modifyRecords(saving: [root, share], deleting: [], savePolicy: .allKeys)
-        
-        guard let savedShare = saved.saveResults.values.compactMap({ try? $0.get() as? CKShare }).first else {
-            let error = NSError(domain: "CloudSyncService", code: 9, userInfo: [NSLocalizedDescriptionKey: "Share was created but not found in save results. Ensure CloudKit schema allows sharing."])
-            ShareDebugStore.shared.appendLog("makeCloudSharingController: failed to retrieve saved share from results")
-            throw error
-        }
-        
-        record.cloudShareRecordName = savedShare.recordID.recordName
-        ShareDebugStore.shared.lastShareURL = savedShare.url
-        ShareDebugStore.shared.appendLog("makeCloudSharingController: saved share id=\(savedShare.recordID.recordName) url=\(String(describing: savedShare.url))")
-        
+
         let controller = UICloudSharingController(share: savedShare, container: container)
-        
         controller.delegate = delegate
         controller.availablePermissions = [.allowReadWrite, .allowPrivate]
         controller.modalPresentationStyle = .formSheet
-        controller.title = shareTitle
+        controller.title = "Shared Medical Record"
         
-        ShareDebugStore.shared.appendLog("makeCloudSharingController: created UICloudSharingController with preparation handler")
+        ShareDebugStore.shared.appendLog("makeCloudSharingController: created UICloudSharingController with share url=\(String(describing: savedShare.url))")
         return controller
     }
 #endif
@@ -640,6 +598,19 @@ final class CloudSyncService {
     private func enrichCloudKitError(_ error: Error) -> Error {
         // Try to map common CKError codes to friendlier messages
         if let ck = error as? CKError {
+            // Special-case: CloudKit Sharing not enabled/deployed in the current environment.
+            // This manifests as: "Cannot create new type cloudkit.share in production schema".
+            let message = ck.localizedDescription
+            if message.contains("cloudkit.share") && message.contains("production schema") {
+                return NSError(
+                    domain: "CloudSyncService",
+                    code: ck.code.rawValue,
+                    userInfo: [
+                        NSLocalizedDescriptionKey: "CloudKit Sharing is not enabled for the Production schema of container \(containerIdentifier). You must enable/deploy CloudKit Sharing for Production in the CloudKit Console (Development → Deploy to Production). This is a server-side configuration issue; the app cannot fix it."
+                    ]
+                )
+            }
+
             switch ck.code {
             case .notAuthenticated:
                 return NSError(domain: "CloudSyncService", code: ck.code.rawValue, userInfo: [NSLocalizedDescriptionKey: "Not signed in to iCloud. Please sign in and try again."])
@@ -660,11 +631,9 @@ final class CloudSyncService {
 #if os(iOS) || targetEnvironment(macCatalyst)
 class CloudSharingDelegate: NSObject, UICloudSharingControllerDelegate {
     var onComplete: ((Result<URL?, Error>) -> Void)?
-    weak var record: MedicalRecord?
-    
+
     func cloudSharingController(_ c: UICloudSharingController, failedToSaveShareWithError error: Error) {
         ShareDebugStore.shared.appendLog("CloudSharingDelegate: failedToSaveShareWithError: \(error)")
-        ShareDebugStore.shared.lastError = error
         print("CloudKit sharing failed: \(error)")
         onComplete?(.failure(error))
     }
@@ -672,27 +641,14 @@ class CloudSharingDelegate: NSObject, UICloudSharingControllerDelegate {
         let url = c.share?.url
         ShareDebugStore.shared.appendLog("CloudSharingDelegate: didSaveShare url=\(String(describing: url))")
         print("CloudKit share saved: \(String(describing: url))")
-        
-        // Capture share information
-        if let share = c.share {
-            record?.cloudShareRecordName = share.recordID.recordName
-            ShareDebugStore.shared.lastShareURL = share.url
-            ShareDebugStore.shared.appendLog("CloudSharingDelegate: saved share id=\(share.recordID.recordName) to record")
-        }
-        
         onComplete?(.success(url))
     }
     func cloudSharingControllerDidStopSharing(_ c: UICloudSharingController) {
         ShareDebugStore.shared.appendLog("CloudSharingDelegate: didStopSharing")
         print("CloudKit sharing stopped")
-        
-        // Clear share information
-        record?.cloudShareRecordName = nil
-        ShareDebugStore.shared.lastShareURL = nil
-        
         onComplete?(.success(nil))
     }
-    func itemTitle(for c: UICloudSharingController) -> String? { CloudSyncService.shared.shareTitle }
+    func itemTitle(for c: UICloudSharingController) -> String? { "Shared Medical Record" }
     func itemThumbnailData(for c: UICloudSharingController) -> Data? { nil }
     func itemType(for c: UICloudSharingController) -> String? { "public.data" }
 }
