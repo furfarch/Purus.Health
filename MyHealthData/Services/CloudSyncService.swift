@@ -29,7 +29,7 @@ final class CloudSyncService {
     private let nanosecondsPerSecond: Double = 1_000_000_000 // For logging conversion
     
     // Sharing constants
-    private let shareTitle = "Shared Medical Record"
+    let shareTitle = "Shared Medical Record"
 
     /// CloudKit record type used for MedicalRecord mirrors.
     /// IMPORTANT:
@@ -325,14 +325,12 @@ final class CloudSyncService {
             
             // Process save results and extract saved records
             var savedShare: CKShare?
-            var savedRoot: CKRecord?
             
             for (_, record) in saveResults {
                 if let share = record as? CKShare {
                     savedShare = share
                     ShareDebugStore.shared.appendLog("createShare: saved CKShare id=\(share.recordID.recordName) url=\(String(describing: share.url))")
                 } else {
-                    savedRoot = record
                     ShareDebugStore.shared.appendLog("createShare: saved root record id=\(record.recordID.recordName) type=\(record.recordType)")
                 }
             }
@@ -487,40 +485,29 @@ final class CloudSyncService {
             }
         }
         
-        // Use UICloudSharingController's preparation handler to create share
-        // This delegates share creation to the system, avoiding manual CKShare creation issues
-        ShareDebugStore.shared.appendLog("makeCloudSharingController: creating share via UICloudSharingController preparation handler")
+        // Create share manually and use modern UICloudSharingController initializer
+        ShareDebugStore.shared.appendLog("makeCloudSharingController: creating share manually")
         
-        let controller = UICloudSharingController(preparationHandler: { [weak self] controller, handler in
-            guard let self = self else {
-                let error = NSError(domain: "CloudSyncService", code: 8, userInfo: [NSLocalizedDescriptionKey: "CloudSyncService deallocated"])
-                ShareDebugStore.shared.appendLog("makeCloudSharingController preparation: service deallocated")
-                handler(nil, nil, error)
-                return
-            }
-            
-            Task { @MainActor in
-                do {
-                    // Create the share
-                    let share = CKShare(rootRecord: root)
-                    share[CKShare.SystemFieldKey.title] = self.shareTitle as CKRecordValue
-                    share.publicPermission = .none
-                    
-                    ShareDebugStore.shared.appendLog("makeCloudSharingController preparation: created CKShare for root=\(root.recordID.recordName)")
-                    
-                    // Save both root and share atomically
-                    // The preparation handler expects us to provide the share, then the controller saves it
-                    handler(share, container, nil)
-                    
-                    // Note: The actual save happens when the user confirms in the UI
-                    // We'll capture the share record name in the delegate callbacks
-                    ShareDebugStore.shared.appendLog("makeCloudSharingController preparation: completed successfully")
-                } catch {
-                    ShareDebugStore.shared.appendLog("makeCloudSharingController preparation: failed: \(error)")
-                    handler(nil, nil, self.enrichCloudKitError(error))
-                }
-            }
-        })
+        let share = CKShare(rootRecord: root)
+        share[CKShare.SystemFieldKey.title] = shareTitle as CKRecordValue
+        share.publicPermission = .none
+        
+        // Save both root and share atomically
+        ShareDebugStore.shared.appendLog("makeCloudSharingController: saving root=\(root.recordID.recordName) and share=\(share.recordID.recordName)")
+        
+        let saved = try await database.modifyRecords(saving: [root, share], deleting: [], savePolicy: .allKeys)
+        
+        guard let savedShare = saved.saveResults.values.compactMap({ try? $0.get() as? CKShare }).first else {
+            let error = NSError(domain: "CloudSyncService", code: 9, userInfo: [NSLocalizedDescriptionKey: "Failed to save share"])
+            ShareDebugStore.shared.appendLog("makeCloudSharingController: failed to save share")
+            throw error
+        }
+        
+        record.cloudShareRecordName = savedShare.recordID.recordName
+        ShareDebugStore.shared.lastShareURL = savedShare.url
+        ShareDebugStore.shared.appendLog("makeCloudSharingController: saved share id=\(savedShare.recordID.recordName) url=\(String(describing: savedShare.url))")
+        
+        let controller = UICloudSharingController(share: savedShare, container: container)
         
         controller.delegate = delegate
         controller.availablePermissions = [.allowReadWrite, .allowPrivate]
