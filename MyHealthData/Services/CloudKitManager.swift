@@ -60,12 +60,48 @@ final class CloudKitManager {
             let share = CKShare(rootRecord: record)
             share[CKShare.SystemFieldKey.title] = "Shared Medical Record" as CKRecordValue
 
-            let modifyOp = CKModifyRecordsOperation(recordsToSave: [record, share], recordIDsToDelete: nil)
+            let modifyOp = CKModifyRecordsOperation(recordsToSave: [record, share], recordIDsToDelete: [])
+            
+            // Track saved records and errors per-record
+            var savedRecords: [CKRecord.ID: CKRecord] = [:]
+            var recordErrors: [CKRecord.ID: Error] = [:]
+            
+            // Handle per-record save results
+            modifyOp.perRecordSaveBlock = { recordID, result in
+                switch result {
+                case .success(let savedRecord):
+                    savedRecords[recordID] = savedRecord
+                case .failure(let error):
+                    recordErrors[recordID] = error
+                }
+            }
+            
             // Use the modern Result-based callback; CKModifyRecordsOperation reports Result<Void, Error>
-            modifyOp.modifyRecordsResultBlock = { (result: Result<Void, Error>) in
+            modifyOp.modifyRecordsResultBlock = { result in
                 switch result {
                 case .success:
-                    completion(share, nil)
+                    // Check if any records failed to save
+                    if !recordErrors.isEmpty {
+                        let errorDescription = recordErrors.map { "\($0.key.recordName): \($0.value.localizedDescription)" }.joined(separator: ", ")
+                        let compositeError = NSError(
+                            domain: "CloudKitManager",
+                            code: 3,
+                            userInfo: [NSLocalizedDescriptionKey: "Failed to save \(recordErrors.count) record(s): \(errorDescription)"]
+                        )
+                        completion(nil, compositeError)
+                    } else {
+                        // Extract the saved share from saved records
+                        if let savedShare = savedRecords.values.first(where: { $0 is CKShare }) as? CKShare {
+                            completion(savedShare, nil)
+                        } else {
+                            let error = NSError(
+                                domain: "CloudKitManager",
+                                code: 4,
+                                userInfo: [NSLocalizedDescriptionKey: "Share was not returned in save results"]
+                            )
+                            completion(nil, error)
+                        }
+                    }
                 case .failure(let opError):
                     completion(nil, opError)
                 }
