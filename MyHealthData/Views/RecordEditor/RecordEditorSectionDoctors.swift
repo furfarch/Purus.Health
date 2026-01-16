@@ -40,6 +40,13 @@ struct RecordEditorSectionDoctors: View {
                     }
                 }
 
+                #if canImport(ContactsUI)
+                ContactPickerButton(title: "Pick from Contacts") { picked in
+                    apply(contact: picked, toDoctorAt: idx)
+                    onChange()
+                }
+                #endif
+
                 TextField(
                     "Name",
                     text: Binding(
@@ -99,5 +106,29 @@ struct RecordEditorSectionDoctors: View {
         } header: {
             Label("Doctors", systemImage: "stethoscope")
         }
+    }
+
+    private func apply(contact: ContactPickerResult, toDoctorAt index: Int) {
+        guard record.humanDoctors.indices.contains(index) else { return }
+
+        let name = contact.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !name.isEmpty {
+            record.humanDoctors[index].name = name
+        }
+
+        if !contact.phone.isEmpty {
+            record.humanDoctors[index].phone = contact.phone
+        }
+
+        if !contact.email.isEmpty {
+            record.humanDoctors[index].email = contact.email
+        }
+
+        let address = contact.postalAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !address.isEmpty {
+            record.humanDoctors[index].address = address
+        }
+
+        record.humanDoctors[index].updatedAt = Date()
     }
 }

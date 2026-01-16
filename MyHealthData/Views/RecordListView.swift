@@ -192,9 +192,22 @@ struct RecordListView: View {
 
     @MainActor
     private func refreshFromCloud() async {
-        // Pull incremental changes (including deletions) so this works without app relaunch.
+        // Only perform a cloud refresh if there is at least one record that participates in cloud.
+        // This keeps cloud sync OFF by default for all-local users.
+        let wantsCloudRefresh = allRecords.contains(where: { $0.isCloudEnabled || $0.locationStatus == .shared })
+        guard wantsCloudRefresh else { return }
+
         let fetcher = CloudKitMedicalRecordFetcher(containerIdentifier: "iCloud.com.furfarch.MyHealthData", modelContext: modelContext)
         fetcher.fetchChanges()
+
+        // Also pull shared records (if any) so changes from others can appear.
+        do {
+            let sharedFetcher = CloudKitSharedMedicalRecordFetcher(containerIdentifier: "iCloud.com.furfarch.MyHealthData", modelContext: modelContext)
+            _ = try await sharedFetcher.fetchAllSharedAsync()
+        } catch {
+            // Best-effort; don't fail refresh UI.
+            ShareDebugStore.shared.appendLog("RecordListView: refresh shared fetch failed: \(error)")
+        }
     }
 }
 

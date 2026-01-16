@@ -7,6 +7,16 @@ struct RecordEditorSectionPetVet: View {
 
     var body: some View {
         Section {
+            #if canImport(ContactsUI)
+            ContactPickerButton(title: "Pick Vet from Contacts") { result in
+                apply(contact: result)
+                onChange()
+            }
+            #else
+            Text("Picking from Contacts is available on iOS only.")
+                .foregroundStyle(.secondary)
+            #endif
+
             TextField("Clinic Name", text: $record.vetClinicName)
             TextField("Contact Name", text: $record.vetContactName)
             TextField("Phone", text: $record.vetPhone)
@@ -24,5 +34,25 @@ struct RecordEditorSectionPetVet: View {
         .onChange(of: record.vetEmail) { _, _ in onChange() }
         .onChange(of: record.vetAddress) { _, _ in onChange() }
         .onChange(of: record.vetNote) { _, _ in onChange() }
+    }
+
+    private func apply(contact: ContactPickerResult) {
+        let name = contact.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !name.isEmpty {
+            record.vetContactName = name
+        }
+
+        if !contact.phone.isEmpty {
+            record.vetPhone = contact.phone
+        }
+
+        if !contact.email.isEmpty {
+            record.vetEmail = contact.email
+        }
+
+        let address = contact.postalAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !address.isEmpty {
+            record.vetAddress = address
+        }
     }
 }

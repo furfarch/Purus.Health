@@ -57,21 +57,7 @@ struct MyHealthDataApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .task {
-                    // Pull changes on launch.
-                    self.cloudFetcher.setModelContext(self.modelContainer.mainContext)
-                    self.cloudFetcher.fetchChanges()
-                }
         }
         .modelContainer(modelContainer)
-        .onChange(of: scenePhase) { _, newPhase in
-            if newPhase == .active {
-                // Pull changes when app becomes active.
-                Task { @MainActor in
-                    self.cloudFetcher.setModelContext(self.modelContainer.mainContext)
-                    self.cloudFetcher.fetchChanges()
-                }
-            }
-        }
     }
 }

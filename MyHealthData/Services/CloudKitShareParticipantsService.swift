@@ -9,6 +9,12 @@ final class CloudKitShareParticipantsService {
     private let containerIdentifier = "iCloud.com.furfarch.MyHealthData"
     private var container: CKContainer { CKContainer(identifier: containerIdentifier) }
 
+    // Keep in sync with CloudSyncService.shareZoneName
+    private let shareZoneName = "MyHealthDataShareZone"
+    private var shareZoneID: CKRecordZone.ID {
+        CKRecordZone.ID(zoneName: shareZoneName, ownerName: CKCurrentUserDefaultName)
+    }
+
     private init() {}
 
     func refreshParticipantsSummary(for record: MedicalRecord) async {
@@ -19,7 +25,7 @@ final class CloudKitShareParticipantsService {
 
         do {
             let db = container.privateCloudDatabase
-            let shareID = CKRecord.ID(recordName: shareRecordName)
+            let shareID = CKRecord.ID(recordName: shareRecordName, zoneID: shareZoneID)
             let fetched = try await db.record(for: shareID)
             guard let share = fetched as? CKShare else {
                 record.shareParticipantsSummary = ""
@@ -29,7 +35,7 @@ final class CloudKitShareParticipantsService {
             record.shareParticipantsSummary = Self.formatParticipants(share.participants)
         } catch {
             // Best effort: keep existing value, but log.
-            ShareDebugStore.shared.appendLog("CloudKitShareParticipantsService: refresh failed share=\(shareRecordName) error=\(error)")
+            ShareDebugStore.shared.appendLog("CloudKitShareParticipantsService: refresh failed share=\(shareRecordName) zone=\(shareZoneName) error=\(error)")
         }
     }
 

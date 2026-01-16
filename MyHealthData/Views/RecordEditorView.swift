@@ -4,92 +4,36 @@ import UniformTypeIdentifiers
 
 struct RecordEditorView: View {
     @Environment(\.modelContext) private var modelContext
-
     @Bindable var record: MedicalRecord
 
-    @State private var isEditing = false
-
+    @State private var isEditing: Bool
     @State private var saveErrorMessage: String?
 
-    @Environment(\.dismiss) private var dismiss
-
-    /// Allow callers to request that the editor starts in editing mode.
     init(record: MedicalRecord, startEditing: Bool = false) {
         self._record = .init(wrappedValue: record)
         self._isEditing = State(initialValue: startEditing)
     }
 
-    // Requested viewer order:
-    // A) Personal
-    // B) Emergency
-    // C) Vet / Doctor
-    // D) Weight (pets only)
-    // E) Blood
-    // F) Medications
-    // G) Vaccinations
-    // H) Allergies
-    // I) Illnesses
-    // J) Documents
-    // K) History
-    // L) Risks
-    // M) Costs (pets only)
-    // N) Record Details
-    private var pagingSections: [RecordSection] {
-        var sections: [RecordSection] = [
-            .personal,
-            .emergency
-        ]
-
-        if record.isPet {
-            sections.append(.petVet)
-            sections.append(.weight)
-        } else {
-            sections.append(.doctors)
-        }
-
-        sections.append(contentsOf: [
-            .blood,
-            .drugs,
-            .vaccinations,
-            .allergies,
-            .illnesses,
-            .medicalDocuments,
-            .medicalHistory,
-            .risks
-        ])
-
-        if record.isPet {
-            sections.append(.petCosts)
-        }
-
-        sections.append(.details)
-        return sections
-    }
-
     var body: some View {
-        Group {
+        Form {
             if isEditing {
-                editList
+                editorForm
             } else {
-                viewPager
+                viewerForm
             }
         }
         .navigationTitle(record.displayName)
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .principal) {
-                HStack(spacing: 8) {
-                    Text(record.displayName)
-                        .font(.headline)
-                        .lineLimit(1)
-
-                    Image(systemName: record.locationStatus.systemImageName)
-                        .foregroundStyle(record.locationStatus.color)
-                        .accessibilityLabel(record.locationStatus.accessibilityLabel)
-                        .accessibilityIdentifier("recordLocationStatusIcon")
+            ToolbarItem(placement: .primaryAction) {
+                Button(isEditing ? "Done" : "Edit") {
+                    if isEditing {
+                        saveAndFinishEditing()
+                    } else {
+                        isEditing = true
+                    }
                 }
             }
-
-            toolbarContent
         }
         .alert(
             "Save Error",
@@ -104,221 +48,223 @@ struct RecordEditorView: View {
         }
     }
 
-    private var editList: some View {
-        List {
-            RecordEditorSectionPersonal(record: record, onChange: touch)
-
-            RecordEditorSectionEmergency(modelContext: modelContext, record: record, onChange: touch)
-
-            if record.isPet {
-                RecordEditorSectionPetVet(record: record, onChange: touch)
-                RecordEditorSectionWeight(modelContext: modelContext, record: record, onChange: touch)
-                RecordEditorSectionPetYearlyCosts(modelContext: modelContext, record: record, onChange: touch)
-            } else {
-                RecordEditorSectionDoctors(modelContext: modelContext, record: record, onChange: touch)
-            }
-
-            RecordEditorSectionBlood(modelContext: modelContext, record: record, onChange: touch)
-            RecordEditorSectionDrugs(modelContext: modelContext, record: record, onChange: touch)
-            RecordEditorSectionVaccinations(modelContext: modelContext, record: record, onChange: touch)
-            RecordEditorSectionAllergies(modelContext: modelContext, record: record, onChange: touch)
-            RecordEditorSectionIllnesses(modelContext: modelContext, record: record, onChange: touch)
-            RecordEditorSectionMedicalDocuments(modelContext: modelContext, record: record, onChange: touch)
-            RecordEditorSectionMedicalHistory(modelContext: modelContext, record: record, onChange: touch)
-            RecordEditorSectionRisks(modelContext: modelContext, record: record, onChange: touch)
-        }
-    }
-
-    private var viewPager: some View {
-        GeometryReader { proxy in
-            ScrollView(.horizontal) {
-                LazyHStack(spacing: 0) {
-                    ForEach(pagingSections) { section in
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: 12) {
-                                RecordSectionHeaderView(section: section)
-
-                                VStack(alignment: .leading, spacing: 0) {
-                                    viewerContent(for: section)
-                                }
-                                .background(.background)
-                                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                                .padding(.horizontal)
-
-                                Spacer(minLength: 24)
-                            }
-                        }
-                        .frame(width: proxy.size.width, height: proxy.size.height)
-                        .id(section)
-                    }
-                }
-                .scrollTargetLayout()
-            }
-            .scrollTargetBehavior(.paging)
-            .scrollIndicators(.hidden)
-        }
-    }
+    // MARK: - Viewer (ordered as requested)
 
     @ViewBuilder
-    private func viewerContent(for section: RecordSection) -> some View {
-        switch section {
-        case .personal:
-            RecordViewerSectionPersonal(record: record)
-        case .emergency:
-            RecordViewerSectionEmergency(record: record)
-        case .petVet:
-            RecordViewerSectionPetVet(record: record)
-        case .doctors:
-            RecordViewerSectionDoctors(record: record)
-        case .weight:
+    private var viewerForm: some View {
+        // A) Personal
+        Section { RecordViewerSectionPersonal(record: record) }
+
+        // B) Emergency
+        Section { RecordViewerSectionEmergency(record: record) }
+
+        // C) Vet / Doctor
+        if record.isPet {
+            Section { RecordViewerSectionPetVet(record: record) }
+        } else {
+            Section { RecordViewerSectionDoctors(record: record) }
+        }
+
+        // D) Weight for Pets only
+        if record.isPet {
+            Section {
+                RecordViewerSectionEntries(
+                    title: "Weight",
+                    columns: ["Date", "kg", "Comment"],
+                    rows: record.weights
+                        .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+                        .map { entry in
+                            [
+                                entry.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
+                                String(format: "%.1f", entry.weightKg ?? 0),
+                                entry.comment
+                            ]
+                        }
+                )
+            }
+        }
+
+        // E) Blood
+        Section {
             RecordViewerSectionEntries(
-                title: "Weight",
-                columns: ["Date", "Weight (kg)", "Comment"],
-                rows: record.weights
+                title: "Blood",
+                columns: ["Date", "Name", "Comment"],
+                rows: record.blood
                     .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
-                    .map { entry in
-                        [
-                            entry.date?.formatted(date: .abbreviated, time: .omitted) ?? "—",
-                            entry.weightKg.map { String(format: "%.1f", $0) } ?? "—",
-                            entry.comment
-                        ]
-                    }
+                    .map { [
+                        $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
+                        $0.name,
+                        $0.comment
+                    ] }
             )
-        case .blood:
-            RecordViewerSectionEntries(
-                title: "Blood Values",
-                columns: ["Date", "Value", "Comment"],
-                rows: record.blood.map { entry in
-                    [
-                        entry.date?.formatted(date: .abbreviated, time: .omitted) ?? "—",
-                        entry.name,
-                        entry.comment
-                    ]
-                }
-            )
-        case .drugs:
+        }
+
+        // F) Medications
+        Section {
             RecordViewerSectionEntries(
                 title: "Medications",
                 columns: ["Date", "Name & Dosage", "Comment"],
-                rows: record.drugs.map { entry in
-                    [
-                        entry.date?.formatted(date: .abbreviated, time: .omitted) ?? "—",
-                        entry.nameAndDosage,
-                        entry.comment
-                    ]
-                }
+                rows: record.drugs
+                    .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+                    .map { [
+                        $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
+                        $0.nameAndDosage,
+                        $0.comment
+                    ] }
             )
-        case .vaccinations:
+        }
+
+        // G) Vaccinations
+        Section {
             RecordViewerSectionEntries(
                 title: "Vaccinations",
-                columns: ["Date", "Name", "Info", "Place", "Comment"],
-                rows: record.vaccinations.map { entry in
-                    [
-                        entry.date?.formatted(date: .abbreviated, time: .omitted) ?? "—",
-                        entry.name,
-                        entry.information,
-                        entry.place,
-                        entry.comment
-                    ]
-                }
+                columns: ["Date", "Name", "Place", "Comment"],
+                rows: record.vaccinations
+                    .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+                    .map { [
+                        $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
+                        $0.name,
+                        $0.place,
+                        $0.comment
+                    ] }
             )
-        case .allergies:
+        }
+
+        // H) Allergies
+        Section {
             RecordViewerSectionEntries(
-                title: "Allergies & Intolerances",
-                columns: ["Date", "Name", "Info", "Comment"],
-                rows: record.allergy.map { entry in
-                    [
-                        entry.date?.formatted(date: .abbreviated, time: .omitted) ?? "—",
-                        entry.name,
-                        entry.information,
-                        entry.comment
-                    ]
-                }
+                title: "Allergies",
+                columns: ["Date", "Name", "Comment"],
+                rows: record.allergy
+                    .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+                    .map { [
+                        $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
+                        $0.name,
+                        $0.comment
+                    ] }
             )
-        case .illnesses:
+        }
+
+        // I) Illnesses
+        Section {
             RecordViewerSectionEntries(
-                title: "Illnesses & Incidents",
-                columns: ["Date", "Name", "Info / Comment"],
-                rows: record.illness.map { entry in
-                    [
-                        entry.date?.formatted(date: .abbreviated, time: .omitted) ?? "—",
-                        entry.name,
-                        entry.informationOrComment
-                    ]
-                }
+                title: "Illnesses",
+                columns: ["Name", "Date", "Comment"],
+                rows: record.illness
+                    .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+                    .map { [
+                        $0.name,
+                        $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
+                        $0.informationOrComment
+                    ] }
             )
-        case .medicalDocuments:
+        }
+
+        // J) Documents
+        Section {
             RecordViewerSectionEntries(
-                title: "Relevant Medical Documents",
-                columns: ["Date", "Title", "Note"],
-                rows: record.medicaldocument.map { entry in
-                    [
-                        entry.date?.formatted(date: .abbreviated, time: .omitted) ?? "—",
-                        entry.name,
-                        entry.note
-                    ]
-                }
+                title: "Documents",
+                columns: ["Name", "Date", "Note"],
+                rows: record.medicaldocument
+                    .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+                    .map { [
+                        $0.name,
+                        $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
+                        $0.note
+                    ] }
             )
-        case .medicalHistory:
+        }
+
+        // K) History
+        Section {
             RecordViewerSectionEntries(
-                title: "Relevant Medical History",
-                columns: ["Date", "Name", "Contact", "Info / Comment"],
-                rows: record.medicalhistory.map { entry in
-                    [
-                        entry.date?.formatted(date: .abbreviated, time: .omitted) ?? "—",
-                        entry.name,
-                        entry.contact,
-                        entry.informationOrComment
-                    ]
-                }
+                title: "History",
+                columns: ["Name", "Date", "Contact", "Comment"],
+                rows: record.medicalhistory
+                    .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+                    .map { [
+                        $0.name,
+                        $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
+                        $0.contact,
+                        $0.informationOrComment
+                    ] }
             )
-        case .risks:
+        }
+
+        // L) Risks
+        Section {
             RecordViewerSectionEntries(
-                title: "Riskfactors",
-                columns: ["Date", "Name", "Description / Comment"],
-                rows: record.risks.map { entry in
-                    [
-                        entry.date?.formatted(date: .abbreviated, time: .omitted) ?? "—",
-                        entry.name,
-                        entry.descriptionOrComment
-                    ]
-                }
+                title: "Risks",
+                columns: ["Date", "Name", "Comment"],
+                rows: record.risks
+                    .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+                    .map { [
+                        $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
+                        $0.name,
+                        $0.descriptionOrComment
+                    ] }
             )
-        case .petCosts:
-            RecordViewerSectionPetYearlyCosts(record: record)
-        case .details:
-            RecordViewerSectionDetails(record: record)
+        }
+
+        // M) Costs for pet only
+        if record.isPet {
+            Section { RecordViewerSectionPetYearlyCosts(record: record) }
+        }
+
+        // N) Record details
+        Section { RecordViewerSectionDetails(record: record) }
+    }
+
+    // MARK: - Editor
+
+    @ViewBuilder
+    private var editorForm: some View {
+        RecordEditorSectionPersonal(record: record) { touchAndSave() }
+        RecordEditorSectionEmergency(modelContext: modelContext, record: record) { touchAndSave() }
+
+        if record.isPet {
+            RecordEditorSectionPetVet(record: record) { touchAndSave() }
+            RecordEditorSectionWeight(modelContext: modelContext, record: record) { touchAndSave() }
+        } else {
+            RecordEditorSectionDoctors(modelContext: modelContext, record: record) { touchAndSave() }
+        }
+
+        RecordEditorSectionBlood(modelContext: modelContext, record: record) { touchAndSave() }
+        RecordEditorSectionDrugs(modelContext: modelContext, record: record) { touchAndSave() }
+        RecordEditorSectionVaccinations(modelContext: modelContext, record: record) { touchAndSave() }
+        RecordEditorSectionAllergies(modelContext: modelContext, record: record) { touchAndSave() }
+        RecordEditorSectionIllnesses(modelContext: modelContext, record: record) { touchAndSave() }
+        RecordEditorSectionMedicalDocuments(modelContext: modelContext, record: record) { touchAndSave() }
+        RecordEditorSectionMedicalHistory(modelContext: modelContext, record: record) { touchAndSave() }
+        RecordEditorSectionRisks(modelContext: modelContext, record: record) { touchAndSave() }
+
+        if record.isPet {
+            RecordEditorSectionPetYearlyCosts(modelContext: modelContext, record: record) { touchAndSave() }
         }
     }
 
-    private func touch() {
+    // MARK: - Persistence
+
+    @MainActor
+    private func touchAndSave() {
         record.updatedAt = Date()
-    }
-
-    private var toolbarContent: some ToolbarContent {
-        ToolbarItemGroup {
-            Button(isEditing ? "Done" : "Edit") {
-                if isEditing {
-                    record.updatedAt = Date()
-                    Task { @MainActor in
-                        do {
-                            try modelContext.save()
-
-                            if record.isCloudEnabled {
-                                try await CloudSyncService.shared.syncIfNeeded(record: record)
-                                try modelContext.save()
-                            }
-
-                            isEditing = false
-                            dismiss()
-                        } catch {
-                            saveErrorMessage = "Save failed: \(error.localizedDescription)"
-                        }
-                    }
-                } else {
-                    isEditing = true
-                }
-            }
+        do {
+            try modelContext.save()
+        } catch {
+            saveErrorMessage = "Save failed: \(error.localizedDescription)"
         }
     }
+
+    @MainActor
+    private func saveAndFinishEditing() {
+        touchAndSave()
+        isEditing = false
+    }
+}
+
+#Preview {
+    NavigationStack {
+        RecordEditorView(record: MedicalRecord(), startEditing: true)
+    }
+    .modelContainer(for: MedicalRecord.self, inMemory: true)
 }

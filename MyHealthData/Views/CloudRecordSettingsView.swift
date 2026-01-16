@@ -44,16 +44,6 @@ struct CloudRecordSettingsView: View {
             }
         }
         .navigationTitle("iCloud")
-        .onChange(of: cloudEnabled) { _, newValue in
-            guard newValue == false else { return }
-            // If the user disables iCloud globally, force all records back to local-only.
-            for record in records {
-                if record.isCloudEnabled || record.isSharingEnabled {
-                    CloudSyncService.shared.disableCloud(for: record)
-                }
-            }
-            try? modelContext.save()
-        }
         .confirmationDialog(
             "Create Share?",
             isPresented: $showShareConfirm,
@@ -137,6 +127,11 @@ struct CloudRecordSettingsView: View {
                         record.isSharingEnabled = true
                         pendingShareRecord = record
                         showShareConfirm = true
+
+                        Task { @MainActor in
+                            await CloudKitShareParticipantsService.shared.refreshParticipantsSummary(for: record)
+                            try? modelContext.save()
+                        }
                     } else {
                         // MVP: local-only toggle. Unsharing CloudKit records can be added later.
                         record.isSharingEnabled = false
