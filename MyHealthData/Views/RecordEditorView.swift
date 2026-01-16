@@ -20,6 +20,42 @@ struct RecordEditorView: View {
         self._isEditing = State(initialValue: startEditing)
     }
 
+    private var pagingSections: [RecordSection] {
+        if record.isPet {
+            return [
+                .personal,
+                .petVet,      // required: 2nd page
+                .petCosts,
+                .weight,      // required: pets can add weight
+                .emergency,
+                .details,
+                .blood,
+                .drugs,
+                .vaccinations,
+                .allergies,
+                .illnesses,
+                .medicalDocuments,
+                .medicalHistory,
+                .risks
+            ]
+        } else {
+            return [
+                .personal,
+                .doctors,
+                .emergency,
+                .details,
+                .blood,
+                .drugs,
+                .vaccinations,
+                .allergies,
+                .illnesses,
+                .medicalDocuments,
+                .medicalHistory,
+                .risks
+            ]
+        }
+    }
+
     var body: some View {
         Group {
             if isEditing {
@@ -66,12 +102,16 @@ struct RecordEditorView: View {
             // Cloud sync & sharing are managed in Settings → iCloud.
 
             RecordEditorSectionPersonal(record: record, onChange: touch)
-            RecordEditorSectionEmergency(modelContext: modelContext, record: record, onChange: touch)
 
             if record.isPet {
                 RecordEditorSectionPetVet(record: record, onChange: touch)
                 RecordEditorSectionPetYearlyCosts(modelContext: modelContext, record: record, onChange: touch)
+                RecordEditorSectionWeight(modelContext: modelContext, record: record, onChange: touch)
+            } else {
+                RecordEditorSectionDoctors(modelContext: modelContext, record: record, onChange: touch)
             }
+
+            RecordEditorSectionEmergency(modelContext: modelContext, record: record, onChange: touch)
 
             RecordEditorSectionBlood(modelContext: modelContext, record: record, onChange: touch)
             RecordEditorSectionDrugs(modelContext: modelContext, record: record, onChange: touch)
@@ -90,7 +130,7 @@ struct RecordEditorView: View {
         GeometryReader { proxy in
             ScrollView(.horizontal) {
                 LazyHStack(spacing: 0) {
-                    ForEach(visibleSections) { section in
+                    ForEach(pagingSections) { section in
                         ScrollView {
                             VStack(alignment: .leading, spacing: 12) {
                                 RecordSectionHeaderView(section: section)
@@ -116,28 +156,19 @@ struct RecordEditorView: View {
         }
     }
 
-    private var visibleSections: [RecordSection] {
-        RecordSection.allCases.filter { section in
-            switch section {
-            case .petVet, .petYearlyCosts:
-                return record.isPet
-            default:
-                return true
-            }
-        }
-    }
-
     @ViewBuilder
     private func viewerContent(for section: RecordSection) -> some View {
         switch section {
         case .personal:
             RecordViewerSectionPersonal(record: record)
-        case .emergency:
-            RecordViewerSectionEmergency(record: record)
         case .petVet:
             RecordViewerSectionPetVet(record: record)
-        case .petYearlyCosts:
+        case .petCosts:
             RecordViewerSectionPetYearlyCosts(record: record)
+        case .doctors:
+            RecordViewerSectionDoctors(record: record)
+        case .emergency:
+            RecordViewerSectionEmergency(record: record)
         case .weight:
             RecordViewerSectionEntries(
                 title: "Weight",
@@ -150,6 +181,8 @@ struct RecordEditorView: View {
                     ]
                 }
             )
+        case .details:
+            RecordViewerSectionDetails(record: record)
         case .blood:
             RecordViewerSectionEntries(
                 title: "Blood Values",
@@ -271,8 +304,6 @@ struct RecordEditorView: View {
         }
         .tag(section)
     }
-
-
 
     private func touch() {
         record.updatedAt = Date()

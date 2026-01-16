@@ -45,7 +45,7 @@ final class MedicalRecord {
     var emergencyNumber: String
     var emergencyEmail: String
 
-    // Relationships (existing ones)
+    // Relationships
     @Relationship(deleteRule: .cascade, inverse: \BloodEntry.record)
     var blood: [BloodEntry] = []
 
@@ -76,9 +76,13 @@ final class MedicalRecord {
     @Relationship(deleteRule: .cascade, inverse: \EmergencyContact.record)
     var emergencyContacts: [EmergencyContact] = []
 
-    // Pet Yearly Costs
+    // Pet costs (date-based entries)
     @Relationship(deleteRule: .cascade, inverse: \PetYearlyCostEntry.record)
     var petYearlyCosts: [PetYearlyCostEntry] = []
+
+    // Human doctors (up to 5)
+    @Relationship(deleteRule: .cascade, inverse: \HumanDoctorEntry.record)
+    var humanDoctors: [HumanDoctorEntry] = []
 
     // CloudKit integration flags (opt-in per-record)
     var isCloudEnabled: Bool = false
@@ -93,7 +97,6 @@ final class MedicalRecord {
     var isSharingEnabled: Bool = false
 
     /// Optional display string for participants (UI-only, best effort).
-    /// For now this may remain empty; we'll populate it later when we add participant fetching.
     var shareParticipantsSummary: String = ""
 
     enum RecordLocationStatus: Equatable {
@@ -138,10 +141,6 @@ final class MedicalRecord {
         return .local
     }
 
-    /// Display name for the record following the pattern: "Family Name - Given Name - Name"
-    /// For pets: uses personalName
-    /// For humans: displays all non-empty fields in order (family, given, name) separated by " - "
-    /// Examples: "Smith - John - Johnny", "Smith - John", "Johnny", "Person" (when all empty)
     var displayName: String {
         if isPet {
             let name = personalName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -150,21 +149,12 @@ final class MedicalRecord {
             let family = personalFamilyName.trimmingCharacters(in: .whitespacesAndNewlines)
             let given = personalGivenName.trimmingCharacters(in: .whitespacesAndNewlines)
             let name = personalNickName.trimmingCharacters(in: .whitespacesAndNewlines)
-            
-            // Build the display name with " - " separator
+
             let parts = [family, given, name].filter { !$0.isEmpty }
-            
-            if parts.isEmpty {
-                return "Person"
-            }
-            
-            return parts.joined(separator: " - ")
+            return parts.isEmpty ? "Person" : parts.joined(separator: " - ")
         }
     }
-    
-    /// Sort key for ordering records
-    /// Humans first, then Pets, both alphabetically sorted by displayName
-    /// Uses "0-" prefix for humans and "1-" prefix for pets to ensure correct ordering
+
     var sortKey: String {
         let prefix = isPet ? "1-" : "0-"
         return prefix + displayName.lowercased()
@@ -210,6 +200,7 @@ final class MedicalRecord {
         weights: [WeightEntry] = [],
         emergencyContacts: [EmergencyContact] = [],
         petYearlyCosts: [PetYearlyCostEntry] = [],
+        humanDoctors: [HumanDoctorEntry] = [],
         isCloudEnabled: Bool = false,
         cloudRecordName: String? = nil,
         cloudShareRecordName: String? = nil,
@@ -231,7 +222,6 @@ final class MedicalRecord {
         self.personalHealthInsuranceNumber = personalHealthInsuranceNumber
         self.personalEmployer = personalEmployer
 
-        // pet fields
         self.isPet = isPet
         self.personalName = personalName
         self.personalAnimalID = personalAnimalID
@@ -261,6 +251,7 @@ final class MedicalRecord {
         self.weights = weights
         self.emergencyContacts = emergencyContacts
         self.petYearlyCosts = petYearlyCosts
+        self.humanDoctors = humanDoctors
 
         self.isCloudEnabled = isCloudEnabled
         self.cloudRecordName = cloudRecordName
@@ -269,19 +260,12 @@ final class MedicalRecord {
         self.shareParticipantsSummary = shareParticipantsSummary
     }
 
-    // MARK: - Pet Vet Helpers
-
     func copyVetDetails(from contact: EmergencyContact) {
-        // We intentionally do not overwrite clinic name/address unless present in the contact note.
-        // The primary goal is to quickly populate contact name/phone/email.
         vetContactName = contact.name
         vetPhone = contact.phone
         vetEmail = contact.email
-
-        if !contact.note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if !contact.note.isEmpty {
             vetNote = contact.note
         }
-
-        updatedAt = Date()
     }
 }

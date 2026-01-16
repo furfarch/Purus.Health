@@ -6,34 +6,56 @@ struct RecordEditorSectionPetYearlyCosts: View {
     @Bindable var record: MedicalRecord
     let onChange: () -> Void
 
+    private var currentYear: Int {
+        Calendar.current.component(.year, from: Date())
+    }
+
     private var sortedIndices: [Int] {
         record.petYearlyCosts.indices.sorted { a, b in
             let lhs = record.petYearlyCosts[a]
             let rhs = record.petYearlyCosts[b]
             if lhs.year != rhs.year { return lhs.year > rhs.year }
-            return lhs.category.localizedCaseInsensitiveCompare(rhs.category) == .orderedAscending
+            return lhs.date > rhs.date
         }
+    }
+
+    private var currentYearTotal: Double {
+        record.petYearlyCosts
+            .filter { $0.year == currentYear }
+            .reduce(0) { $0 + $1.amount }
     }
 
     var body: some View {
         Section {
             if record.petYearlyCosts.isEmpty {
-                Text("Track recurring yearly pet costs (e.g., insurance, food, vet).")
+                Text("Add cost entries by date (e.g., Vet Check Up, 01.01.2026, 100). The app sums these for the year.")
                     .foregroundStyle(.secondary)
+            } else {
+                HStack {
+                    Text("Total \(currentYear)")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text(currentYearTotal, format: .currency(code: Locale.current.currency?.identifier ?? "CHF"))
+                        .fontWeight(.semibold)
+                }
             }
 
             ForEach(sortedIndices, id: \.self) { idx in
-                let binding = Binding<PetYearlyCostEntry>(
-                    get: { record.petYearlyCosts[idx] },
-                    set: { record.petYearlyCosts[idx] = $0 }
+                DatePicker(
+                    "Date",
+                    selection: Binding(
+                        get: { record.petYearlyCosts[idx].date },
+                        set: { record.petYearlyCosts[idx].date = $0; onChange() }
+                    ),
+                    displayedComponents: .date
                 )
 
                 HStack {
                     TextField(
-                        "Category",
+                        "Title",
                         text: Binding(
-                            get: { binding.wrappedValue.category },
-                            set: { record.petYearlyCosts[idx].category = $0; onChange() }
+                            get: { record.petYearlyCosts[idx].title },
+                            set: { record.petYearlyCosts[idx].title = $0; onChange() }
                         )
                     )
 
@@ -46,16 +68,6 @@ struct RecordEditorSectionPetYearlyCosts: View {
                     } label: {
                         Image(systemName: "trash")
                     }
-                }
-
-                Stepper(
-                    value: Binding(
-                        get: { record.petYearlyCosts[idx].year },
-                        set: { record.petYearlyCosts[idx].year = $0; onChange() }
-                    ),
-                    in: 1990...2100
-                ) {
-                    Text("Year: \(record.petYearlyCosts[idx].year)")
                 }
 
                 HStack {
@@ -83,15 +95,19 @@ struct RecordEditorSectionPetYearlyCosts: View {
                     axis: .vertical
                 )
                 .lineLimit(1...3)
+
+                if idx != sortedIndices.last {
+                    Divider()
+                }
             }
 
-            Button("Add Yearly Cost") {
+            Button("Add Cost Entry") {
                 let entry = PetYearlyCostEntry(record: record)
                 record.petYearlyCosts.append(entry)
                 onChange()
             }
         } header: {
-            Label("Yearly Costs", systemImage: "eurosign.circle")
+            Label("Costs", systemImage: "eurosign.circle")
         }
     }
 }

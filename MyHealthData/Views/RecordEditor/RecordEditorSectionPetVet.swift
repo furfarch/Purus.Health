@@ -7,18 +7,35 @@ struct RecordEditorSectionPetVet: View {
 
     @State private var selectedEmergencyContactID: UUID?
 
-    private var selectedContact: EmergencyContact? {
-        guard let selectedEmergencyContactID else { return nil }
-        return record.emergencyContacts.first(where: { $0.id == selectedEmergencyContactID })
-    }
-
-    private var hasContacts: Bool {
-        !record.emergencyContacts.isEmpty
-    }
-
     var body: some View {
         Section {
-            contactPickerAndCopy
+            ContactPickerButton(title: "Choose Vet from Contacts") { picked in
+                if record.vetContactName.isEmpty { record.vetContactName = picked.displayName }
+                if record.vetPhone.isEmpty { record.vetPhone = picked.phone }
+                if record.vetEmail.isEmpty { record.vetEmail = picked.email }
+                if record.vetAddress.isEmpty { record.vetAddress = picked.postalAddress }
+                onChange()
+            }
+
+            if !record.emergencyContacts.isEmpty {
+                Picker("Copy from Emergency Contact", selection: $selectedEmergencyContactID) {
+                    Text("").tag(UUID?.none)
+                    ForEach(record.emergencyContacts) { contact in
+                        Text(contact.name.isEmpty ? "(No Name)" : contact.name)
+                            .tag(Optional(contact.id))
+                    }
+                }
+
+                Button("Copy from Selected Emergency Contact") {
+                    guard let selectedID = selectedEmergencyContactID,
+                          let contact = record.emergencyContacts.first(where: { $0.id == selectedID })
+                    else { return }
+
+                    record.copyVetDetails(from: contact)
+                    onChange()
+                }
+                .disabled(selectedEmergencyContactID == nil)
+            }
 
             TextField("Clinic Name", text: $record.vetClinicName)
             TextField("Contact Name", text: $record.vetContactName)
@@ -42,31 +59,5 @@ struct RecordEditorSectionPetVet: View {
         .onChange(of: record.vetEmail) { _, _ in onChange() }
         .onChange(of: record.vetAddress) { _, _ in onChange() }
         .onChange(of: record.vetNote) { _, _ in onChange() }
-    }
-
-    @ViewBuilder
-    private var contactPickerAndCopy: some View {
-        if !hasContacts {
-            Text("Add an Emergency Contact first, then you can select it as your vet contact.")
-                .foregroundStyle(.secondary)
-        } else {
-            Picker("Select Contact", selection: Binding(
-                get: { selectedEmergencyContactID },
-                set: { selectedEmergencyContactID = $0 }
-            )) {
-                Text("None").tag(Optional<UUID>.none)
-                ForEach(record.emergencyContacts) { contact in
-                    Text(contact.name.isEmpty ? "(No Name)" : contact.name)
-                        .tag(Optional(contact.id))
-                }
-            }
-
-            Button("Copy from Selected Contact") {
-                guard let contact = selectedContact else { return }
-                record.copyVetDetails(from: contact)
-                onChange()
-            }
-            .disabled(selectedContact == nil)
-        }
     }
 }

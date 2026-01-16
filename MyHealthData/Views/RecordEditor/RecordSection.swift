@@ -2,8 +2,12 @@ import Foundation
 
 enum RecordSection: String, CaseIterable, Identifiable {
     case personal
+    case petVet
+    case petCosts
+    case doctors
     case emergency
     case weight
+    case details
     case blood
     case drugs
     case vaccinations
@@ -12,16 +16,18 @@ enum RecordSection: String, CaseIterable, Identifiable {
     case medicalDocuments
     case medicalHistory
     case risks
-    case petVet
-    case petYearlyCosts
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .personal: return "Personal"
+        case .petVet: return "Vet"
+        case .petCosts: return "Costs"
+        case .doctors: return "Doctors"
         case .emergency: return "Emergency"
         case .weight: return "Weight"
+        case .details: return "Record Details"
         case .blood: return "Blood"
         case .drugs: return "Medications"
         case .vaccinations: return "Vaccinations"
@@ -30,16 +36,18 @@ enum RecordSection: String, CaseIterable, Identifiable {
         case .medicalDocuments: return "Documents"
         case .medicalHistory: return "History"
         case .risks: return "Risks"
-        case .petVet: return "Vet"
-        case .petYearlyCosts: return "Yearly Costs"
         }
     }
 
     var sfSymbol: String {
         switch self {
         case .personal: return "person.text.rectangle"
+        case .petVet: return "stethoscope.circle"
+        case .petCosts: return "eurosign.circle"
+        case .doctors: return "stethoscope"
         case .emergency: return "cross.case"
         case .weight: return "scalemass"
+        case .details: return "info.circle"
         case .blood: return "drop"
         case .drugs: return "pills"
         case .vaccinations: return "syringe"
@@ -48,8 +56,6 @@ enum RecordSection: String, CaseIterable, Identifiable {
         case .medicalDocuments: return "doc.text"
         case .medicalHistory: return "clock.arrow.circlepath"
         case .risks: return "exclamationmark.triangle"
-        case .petVet: return "stethoscope.circle"
-        case .petYearlyCosts: return "eurosign.circle"
         }
     }
 }

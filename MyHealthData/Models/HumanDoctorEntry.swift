@@ -2,27 +2,23 @@ import Foundation
 import SwiftData
 
 @Model
-final class PetYearlyCostEntry {
+final class HumanDoctorEntry {
     var createdAt: Date
     var updatedAt: Date
 
-    // Local stable identifier
     var uuid: String
     var id: String { uuid }
 
-    /// Date the expense occurred.
-    var date: Date
+    /// e.g. "GP", "Dentist", "Cardiologist"
+    var type: String
 
-    /// Short description, e.g. "Vet Check Up".
-    var title: String
+    /// Doctor's name
+    var name: String
 
-    var amount: Double
+    var phone: String
+    var email: String
+    var address: String
     var note: String
-
-    /// Convenience for grouping by year in UI.
-    var year: Int {
-        Calendar.current.component(.year, from: date)
-    }
 
     var record: MedicalRecord? = nil
 
@@ -30,18 +26,22 @@ final class PetYearlyCostEntry {
         uuid: String = UUID().uuidString,
         createdAt: Date = Date(),
         updatedAt: Date = Date(),
-        date: Date = Date(),
-        title: String = "",
-        amount: Double = 0,
+        type: String = "",
+        name: String = "",
+        phone: String = "",
+        email: String = "",
+        address: String = "",
         note: String = "",
         record: MedicalRecord? = nil
     ) {
         self.uuid = uuid
         self.createdAt = createdAt
         self.updatedAt = updatedAt
-        self.date = date
-        self.title = title
-        self.amount = amount
+        self.type = type
+        self.name = name
+        self.phone = phone
+        self.email = email
+        self.address = address
         self.note = note
         self.record = record
     }
