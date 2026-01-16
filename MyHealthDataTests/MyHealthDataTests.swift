@@ -30,7 +30,8 @@ struct MyHealthDataTests {
             MedicalHistoryEntry.self,
             MedicalDocumentEntry.self,
             EmergencyContact.self,
-            WeightEntry.self
+            WeightEntry.self,
+            PetYearlyCostEntry.self
         ])
 
         let config = ModelConfiguration(
@@ -270,5 +271,47 @@ struct MyHealthDataTests {
         #expect(sorted[2].isPet == true, "Third should be pet")
         #expect(sorted[3].displayName == "Zebra", "Fourth should be pet 'Zebra'")
         #expect(sorted[3].isPet == true, "Fourth should be pet")
+    }
+    
+    @Test @MainActor func testPetYearlyCostsCascadeDelete() async throws {
+        let schema = Schema([MedicalRecord.self, PetYearlyCostEntry.self])
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: schema, configurations: [config])
+        let context = container.mainContext
+
+        let record = MedicalRecord(isPet: true, personalName: "Fluffy")
+        context.insert(record)
+
+        let cost = PetYearlyCostEntry(year: 2026, category: "Food", amount: 123.45, note: "Dry food", record: record)
+        record.petYearlyCosts.append(cost)
+
+        try context.save()
+
+        // Sanity: cost exists
+        let allCostsBefore = try context.fetch(FetchDescriptor<PetYearlyCostEntry>())
+        #expect(allCostsBefore.count == 1)
+
+        // Delete record -> costs should be cascade-deleted
+        context.delete(record)
+        try context.save()
+
+        let allCostsAfter = try context.fetch(FetchDescriptor<PetYearlyCostEntry>())
+        #expect(allCostsAfter.isEmpty)
+    }
+
+    @Test func testCopyVetDetailsFromEmergencyContact() async throws {
+        let record = MedicalRecord(isPet: true)
+        let contact = EmergencyContact(record: record)
+        contact.name = "Dr. Jane"
+        contact.phone = "+41 44 123 45 67"
+        contact.email = "vet@example.com"
+        contact.note = "Preferred vet"
+
+        record.copyVetDetails(from: contact)
+
+        #expect(record.vetContactName == "Dr. Jane")
+        #expect(record.vetPhone == "+41 44 123 45 67")
+        #expect(record.vetEmail == "vet@example.com")
+        #expect(record.vetNote == "Preferred vet")
     }
 }

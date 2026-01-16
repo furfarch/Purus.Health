@@ -28,7 +28,8 @@ struct MyHealthDataApp: App {
             MedicalHistoryEntry.self,
             MedicalDocumentEntry.self,
             EmergencyContact.self,
-            WeightEntry.self
+            WeightEntry.self,
+            PetYearlyCostEntry.self
         ])
 
         let localConfig = ModelConfiguration(

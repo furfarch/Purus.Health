@@ -12,10 +12,8 @@ enum RecordSection: String, CaseIterable, Identifiable {
     case medicalDocuments
     case medicalHistory
     case risks
-    case doctors
-    case details
-    case vet
-    case petCosts
+    case petVet
+    case petYearlyCosts
 
     var id: String { rawValue }
 
@@ -32,10 +30,8 @@ enum RecordSection: String, CaseIterable, Identifiable {
         case .medicalDocuments: return "Documents"
         case .medicalHistory: return "History"
         case .risks: return "Risks"
-        case .doctors: return "Doctors"
-        case .details: return "Details"
-        case .vet: return "Veterinarian"
-        case .petCosts: return "Pet Costs"
+        case .petVet: return "Vet"
+        case .petYearlyCosts: return "Yearly Costs"
         }
     }
 
@@ -52,38 +48,8 @@ enum RecordSection: String, CaseIterable, Identifiable {
         case .medicalDocuments: return "doc.text"
         case .medicalHistory: return "clock.arrow.circlepath"
         case .risks: return "exclamationmark.triangle"
-        case .doctors: return "stethoscope"
-        case .details: return "info.circle"
-        case .vet: return "pawprint"
-        case .petCosts: return "dollarsign.circle"
+        case .petVet: return "stethoscope.circle"
+        case .petYearlyCosts: return "eurosign.circle"
         }
-    }
-
-    static func sections(for record: MedicalRecord) -> [RecordSection] {
-        var sections: [RecordSection] = [
-            .personal,
-            .emergency,
-            .blood,
-            .drugs,
-            .vaccinations,
-            .allergies,
-            .illnesses,
-            .medicalDocuments,
-            .medicalHistory,
-            .risks
-        ]
-
-        if record.isPet {
-            // Pets-only
-            sections.insert(.weight, at: 2)
-            sections.append(.vet)
-            sections.append(.petCosts)
-        } else {
-            // Humans-only: Doctors right after Personal
-            sections.insert(.doctors, at: 1)
-        }
-
-        sections.append(.details)
-        return sections
     }
 }

@@ -32,6 +32,14 @@ final class MedicalRecord {
     var ownerPhone: String
     var ownerEmail: String
 
+    // Pet veterinarian fields
+    var vetClinicName: String
+    var vetContactName: String
+    var vetPhone: String
+    var vetEmail: String
+    var vetAddress: String
+    var vetNote: String
+
     // Legacy single emergency contact fields (kept for backward compatibility)
     var emergencyName: String
     var emergencyNumber: String
@@ -67,6 +75,10 @@ final class MedicalRecord {
 
     @Relationship(deleteRule: .cascade, inverse: \EmergencyContact.record)
     var emergencyContacts: [EmergencyContact] = []
+
+    // Pet Yearly Costs
+    @Relationship(deleteRule: .cascade, inverse: \PetYearlyCostEntry.record)
+    var petYearlyCosts: [PetYearlyCostEntry] = []
 
     // CloudKit integration flags (opt-in per-record)
     var isCloudEnabled: Bool = false
@@ -178,6 +190,12 @@ final class MedicalRecord {
         ownerName: String = "",
         ownerPhone: String = "",
         ownerEmail: String = "",
+        vetClinicName: String = "",
+        vetContactName: String = "",
+        vetPhone: String = "",
+        vetEmail: String = "",
+        vetAddress: String = "",
+        vetNote: String = "",
         emergencyName: String = "",
         emergencyNumber: String = "",
         emergencyEmail: String = "",
@@ -191,6 +209,7 @@ final class MedicalRecord {
         medicaldocument: [MedicalDocumentEntry] = [],
         weights: [WeightEntry] = [],
         emergencyContacts: [EmergencyContact] = [],
+        petYearlyCosts: [PetYearlyCostEntry] = [],
         isCloudEnabled: Bool = false,
         cloudRecordName: String? = nil,
         cloudShareRecordName: String? = nil,
@@ -220,6 +239,13 @@ final class MedicalRecord {
         self.ownerPhone = ownerPhone
         self.ownerEmail = ownerEmail
 
+        self.vetClinicName = vetClinicName
+        self.vetContactName = vetContactName
+        self.vetPhone = vetPhone
+        self.vetEmail = vetEmail
+        self.vetAddress = vetAddress
+        self.vetNote = vetNote
+
         self.emergencyName = emergencyName
         self.emergencyNumber = emergencyNumber
         self.emergencyEmail = emergencyEmail
@@ -234,11 +260,28 @@ final class MedicalRecord {
         self.medicaldocument = medicaldocument
         self.weights = weights
         self.emergencyContacts = emergencyContacts
+        self.petYearlyCosts = petYearlyCosts
 
         self.isCloudEnabled = isCloudEnabled
         self.cloudRecordName = cloudRecordName
         self.cloudShareRecordName = cloudShareRecordName
         self.isSharingEnabled = isSharingEnabled
         self.shareParticipantsSummary = shareParticipantsSummary
+    }
+
+    // MARK: - Pet Vet Helpers
+
+    func copyVetDetails(from contact: EmergencyContact) {
+        // We intentionally do not overwrite clinic name/address unless present in the contact note.
+        // The primary goal is to quickly populate contact name/phone/email.
+        vetContactName = contact.name
+        vetPhone = contact.phone
+        vetEmail = contact.email
+
+        if !contact.note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            vetNote = contact.note
+        }
+
+        updatedAt = Date()
     }
 }

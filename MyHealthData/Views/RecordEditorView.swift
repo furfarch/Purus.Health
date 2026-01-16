@@ -68,6 +68,11 @@ struct RecordEditorView: View {
             RecordEditorSectionPersonal(record: record, onChange: touch)
             RecordEditorSectionEmergency(modelContext: modelContext, record: record, onChange: touch)
 
+            if record.isPet {
+                RecordEditorSectionPetVet(record: record, onChange: touch)
+                RecordEditorSectionPetYearlyCosts(modelContext: modelContext, record: record, onChange: touch)
+            }
+
             RecordEditorSectionBlood(modelContext: modelContext, record: record, onChange: touch)
             RecordEditorSectionDrugs(modelContext: modelContext, record: record, onChange: touch)
             RecordEditorSectionVaccinations(modelContext: modelContext, record: record, onChange: touch)
@@ -85,7 +90,7 @@ struct RecordEditorView: View {
         GeometryReader { proxy in
             ScrollView(.horizontal) {
                 LazyHStack(spacing: 0) {
-                    ForEach(RecordSection.allCases) { section in
+                    ForEach(visibleSections) { section in
                         ScrollView {
                             VStack(alignment: .leading, spacing: 12) {
                                 RecordSectionHeaderView(section: section)
@@ -111,6 +116,17 @@ struct RecordEditorView: View {
         }
     }
 
+    private var visibleSections: [RecordSection] {
+        RecordSection.allCases.filter { section in
+            switch section {
+            case .petVet, .petYearlyCosts:
+                return record.isPet
+            default:
+                return true
+            }
+        }
+    }
+
     @ViewBuilder
     private func viewerContent(for section: RecordSection) -> some View {
         switch section {
@@ -118,6 +134,10 @@ struct RecordEditorView: View {
             RecordViewerSectionPersonal(record: record)
         case .emergency:
             RecordViewerSectionEmergency(record: record)
+        case .petVet:
+            RecordViewerSectionPetVet(record: record)
+        case .petYearlyCosts:
+            RecordViewerSectionPetYearlyCosts(record: record)
         case .weight:
             RecordViewerSectionEntries(
                 title: "Weight",
@@ -230,8 +250,6 @@ struct RecordEditorView: View {
                     ]
                 }
             )
-        default:
-            RecordViewerSectionEntries(title: section.title, columns: ["Info"], rows: [["(coming soon)"]])
         }
     }
 
