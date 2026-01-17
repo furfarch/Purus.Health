@@ -10,29 +10,29 @@ final class PetYearlyCostEntry {
     var uuid: String
     var id: String { uuid }
 
-    var title: String
-    var date: Date
-    var amount: Double?
+    var year: Int
+    var category: String
+    var amount: Double
     var note: String
 
-    // Keep a plain reference to the owning record; the inverse is declared on MedicalRecord.
+    // Inverse is declared on MedicalRecord.petYearlyCosts.
     var record: MedicalRecord?
 
     init(
         uuid: String = UUID().uuidString,
         createdAt: Date = Date(),
         updatedAt: Date = Date(),
-        title: String = "",
-        date: Date = Date(),
-        amount: Double? = nil,
+        year: Int = Calendar.current.component(.year, from: Date()),
+        category: String = "",
+        amount: Double = 0,
         note: String = "",
         record: MedicalRecord? = nil
     ) {
         self.uuid = uuid
         self.createdAt = createdAt
         self.updatedAt = updatedAt
-        self.title = title
-        self.date = date
+        self.year = year
+        self.category = category
         self.amount = amount
         self.note = note
         self.record = record

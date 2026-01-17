@@ -20,76 +20,80 @@ struct RecordEditorSectionDoctors: View {
             }
 
             ForEach(sortedIndices, id: \.self) { idx in
-                HStack {
+                VStack(alignment: .leading, spacing: 12) {
+                    ContactPickerButton(title: "Pick from Contacts") { contact in
+                        record.humanDoctors[idx].name = contact.displayName
+                        record.humanDoctors[idx].phone = contact.phone
+                        record.humanDoctors[idx].email = contact.email
+                        record.humanDoctors[idx].address = contact.postalAddress
+                        onChange()
+                    }
+
+                    HStack {
+                        TextField(
+                            "Type (e.g., GP)",
+                            text: Binding(
+                                get: { record.humanDoctors[idx].type },
+                                set: { record.humanDoctors[idx].type = $0; onChange() }
+                            )
+                        )
+
+                        Spacer()
+
+                        Button(role: .destructive) {
+                            let removed = record.humanDoctors.remove(at: idx)
+                            modelContext.delete(removed)
+                            onChange()
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                    }
+
                     TextField(
-                        "Type (e.g., GP)",
+                        "Name",
                         text: Binding(
-                            get: { record.humanDoctors[idx].type },
-                            set: { record.humanDoctors[idx].type = $0; onChange() }
+                            get: { record.humanDoctors[idx].name },
+                            set: { record.humanDoctors[idx].name = $0; onChange() }
                         )
                     )
 
-                    Spacer()
+                    TextField(
+                        "Phone",
+                        text: Binding(
+                            get: { record.humanDoctors[idx].phone },
+                            set: { record.humanDoctors[idx].phone = $0; onChange() }
+                        )
+                    )
 
-                    Button(role: .destructive) {
-                        let removed = record.humanDoctors.remove(at: idx)
-                        modelContext.delete(removed)
-                        onChange()
-                    } label: {
-                        Image(systemName: "trash")
-                    }
+                    TextField(
+                        "Email",
+                        text: Binding(
+                            get: { record.humanDoctors[idx].email },
+                            set: { record.humanDoctors[idx].email = $0; onChange() }
+                        )
+                    )
+
+                    TextField(
+                        "Address",
+                        text: Binding(
+                            get: { record.humanDoctors[idx].address },
+                            set: { record.humanDoctors[idx].address = $0; onChange() }
+                        ),
+                        axis: .vertical
+                    )
+                    .lineLimit(1...3)
+
+                    TextField(
+                        "Note",
+                        text: Binding(
+                            get: { record.humanDoctors[idx].note },
+                            set: { record.humanDoctors[idx].note = $0; onChange() }
+                        ),
+                        axis: .vertical
+                    )
+                    .lineLimit(1...3)
                 }
-
-                #if canImport(ContactsUI)
-                ContactPickerButton(title: "Pick from Contacts") { picked in
-                    apply(contact: picked, toDoctorAt: idx)
-                    onChange()
-                }
-                #endif
-
-                TextField(
-                    "Name",
-                    text: Binding(
-                        get: { record.humanDoctors[idx].name },
-                        set: { record.humanDoctors[idx].name = $0; onChange() }
-                    )
-                )
-
-                TextField(
-                    "Phone",
-                    text: Binding(
-                        get: { record.humanDoctors[idx].phone },
-                        set: { record.humanDoctors[idx].phone = $0; onChange() }
-                    )
-                )
-
-                TextField(
-                    "Email",
-                    text: Binding(
-                        get: { record.humanDoctors[idx].email },
-                        set: { record.humanDoctors[idx].email = $0; onChange() }
-                    )
-                )
-
-                TextField(
-                    "Address",
-                    text: Binding(
-                        get: { record.humanDoctors[idx].address },
-                        set: { record.humanDoctors[idx].address = $0; onChange() }
-                    ),
-                    axis: .vertical
-                )
-                .lineLimit(1...3)
-
-                TextField(
-                    "Note",
-                    text: Binding(
-                        get: { record.humanDoctors[idx].note },
-                        set: { record.humanDoctors[idx].note = $0; onChange() }
-                    ),
-                    axis: .vertical
-                )
-                .lineLimit(1...3)
+                .padding(.vertical, 4)
 
                 if idx != sortedIndices.last {
                     Divider()
@@ -106,29 +110,5 @@ struct RecordEditorSectionDoctors: View {
         } header: {
             Label("Doctors", systemImage: "stethoscope")
         }
-    }
-
-    private func apply(contact: ContactPickerResult, toDoctorAt index: Int) {
-        guard record.humanDoctors.indices.contains(index) else { return }
-
-        let name = contact.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !name.isEmpty {
-            record.humanDoctors[index].name = name
-        }
-
-        if !contact.phone.isEmpty {
-            record.humanDoctors[index].phone = contact.phone
-        }
-
-        if !contact.email.isEmpty {
-            record.humanDoctors[index].email = contact.email
-        }
-
-        let address = contact.postalAddress.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !address.isEmpty {
-            record.humanDoctors[index].address = address
-        }
-
-        record.humanDoctors[index].updatedAt = Date()
     }
 }

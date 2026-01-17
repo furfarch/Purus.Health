@@ -7,17 +7,19 @@ struct RecordViewerSectionPetYearlyCosts: View {
 
     private var yearPickerYears: [Int] {
         let current = Calendar.current.component(.year, from: Date())
-        let years = Set(record.petYearlyCosts.map { Calendar.current.component(.year, from: $0.date) } + [current])
+        let years = Set(record.petYearlyCosts.map { $0.year } + [current])
         return Array(years).sorted(by: >)
     }
 
     private var entriesForSelectedYear: [PetYearlyCostEntry] {
-        let filtered = record.petYearlyCosts.filter { Calendar.current.component(.year, from: $0.date) == selectedYear }
-        return filtered.sorted { $0.date > $1.date }
+        let filtered = record.petYearlyCosts.filter { $0.year == selectedYear }
+        return filtered.sorted { (lhs: PetYearlyCostEntry, rhs: PetYearlyCostEntry) in
+            lhs.category.localizedCaseInsensitiveCompare(rhs.category) == .orderedAscending
+        }
     }
 
     private var selectedYearTotal: Double {
-        entriesForSelectedYear.reduce(0) { $0 + ($1.amount ?? 0) }
+        entriesForSelectedYear.reduce(0) { $0 + $1.amount }
     }
 
     var body: some View {
@@ -40,7 +42,7 @@ struct RecordViewerSectionPetYearlyCosts: View {
                 Text("Total")
                     .foregroundStyle(.secondary)
                 Spacer()
-                Text(selectedYearTotal, format: .currency(code: Locale.current.currency?.identifier ?? "CHF"))
+                Text(selectedYearTotal, format: .currency(code: Locale.current.currency?.identifier ?? "USD"))
                     .fontWeight(.semibold)
             }
             .padding(.horizontal)
@@ -55,13 +57,12 @@ struct RecordViewerSectionPetYearlyCosts: View {
                     .padding(.vertical, 12)
             } else {
                 RecordViewerSectionEntries(
-                    title: "Costs",
-                    columns: ["Title", "Date", "Amount", "Note"],
+                    title: "Yearly Costs",
+                    columns: ["Category", "Amount", "Note"],
                     rows: entriesForSelectedYear.map { entry in
                         [
-                            entry.title,
-                            entry.date.formatted(date: .numeric, time: .omitted),
-                            String(format: "%.2f", entry.amount ?? 0),
+                            entry.category,
+                            String(format: "%.2f", entry.amount),
                             entry.note
                         ]
                     }

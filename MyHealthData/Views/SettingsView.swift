@@ -12,6 +12,9 @@ struct SettingsView: View {
 
     private let containerIdentifier = "iCloud.com.furfarch.MyHealthData"
 
+    // Display settings
+    @AppStorage("recordViewerStyle") private var viewerStyle: String = "cards"
+
     var body: some View {
         NavigationStack {
             List {

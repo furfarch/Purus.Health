@@ -6,8 +6,11 @@ struct RecordEditorView: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var record: MedicalRecord
 
+    @AppStorage("recordViewerStyle") private var viewerStyle: String = "cards"
+
     @State private var isEditing: Bool
     @State private var saveErrorMessage: String?
+    @State private var showCloudSettings: Bool = false
 
     init(record: MedicalRecord, startEditing: Bool = false) {
         self._record = .init(wrappedValue: record)
@@ -15,11 +18,17 @@ struct RecordEditorView: View {
     }
 
     var body: some View {
-        Form {
-            if isEditing {
-                editorForm
+        Group {
+            if viewerStyle == "cards" && !isEditing {
+                cardViewer
             } else {
-                viewerForm
+                Form {
+                    if isEditing {
+                        editorForm
+                    } else {
+                        viewerFormList
+                    }
+                }
             }
         }
         .navigationTitle(record.displayName)
@@ -31,6 +40,13 @@ struct RecordEditorView: View {
                         saveAndFinishEditing()
                     } else {
                         isEditing = true
+                    }
+                }
+            }
+            ToolbarItem(placement: .navigationBarLeading) {
+                if isEditing {
+                    Button("Cloud & Sharing") {
+                        showCloudSettings = true
                     }
                 }
             }
@@ -46,12 +62,187 @@ struct RecordEditorView: View {
         } message: {
             Text(saveErrorMessage ?? "Unknown error")
         }
+        .sheet(isPresented: $showCloudSettings) {
+            NavigationStack { CloudRecordSettingsView() }
+        }
     }
 
-    // MARK: - Viewer (ordered as requested)
+    // MARK: - Card viewer
+
+    private struct CardPage: Identifiable {
+        let id = UUID()
+        let title: String
+        let content: AnyView
+    }
+
+    private var cardPages: [CardPage] {
+        var pages: [CardPage] = [
+            .init(title: "Personal", content: AnyView(RecordViewerSectionPersonal(record: record).padding(.top, 4))),
+            .init(title: "Emergency", content: AnyView(RecordViewerSectionEmergency(record: record).padding(.top, 4)))
+        ]
+
+        if record.isPet {
+            pages.append(.init(title: "Veterinarian", content: AnyView(RecordViewerSectionPetVet(record: record).padding(.top, 4))))
+        } else {
+            pages.append(.init(title: "Doctors", content: AnyView(RecordViewerSectionDoctors(record: record).padding(.top, 4))))
+        }
+
+        if record.isPet {
+            pages.append(.init(title: "Weight", content: AnyView(
+                RecordViewerSectionEntries(
+                    title: "Weight",
+                    columns: ["Date", "kg", "Comment"],
+                    rows: record.weights
+                        .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+                        .map { entry in
+                            [
+                                entry.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
+                                String(format: "%.1f", entry.weightKg ?? 0),
+                                entry.comment
+                            ]
+                        }
+                ).padding(.top, 4)
+            )))
+        }
+
+        pages.append(contentsOf: [
+            .init(title: "Blood", content: AnyView(
+                RecordViewerSectionEntries(
+                    title: "Blood",
+                    columns: ["Date", "Name", "Comment"],
+                    rows: record.blood
+                        .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+                        .map { [
+                            $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
+                            $0.name,
+                            $0.comment
+                        ] }
+                ).padding(.top, 4)
+            )),
+            .init(title: "Medications", content: AnyView(
+                RecordViewerSectionEntries(
+                    title: "Medications",
+                    columns: ["Date", "Name & Dosage", "Comment"],
+                    rows: record.drugs
+                        .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+                        .map { [
+                            $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
+                            $0.nameAndDosage,
+                            $0.comment
+                        ] }
+                ).padding(.top, 4)
+            )),
+            .init(title: "Vaccinations", content: AnyView(
+                RecordViewerSectionEntries(
+                    title: "Vaccinations",
+                    columns: ["Date", "Name", "Place", "Comment"],
+                    rows: record.vaccinations
+                        .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+                        .map { [
+                            $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
+                            $0.name,
+                            $0.place,
+                            $0.comment
+                        ] }
+                ).padding(.top, 4)
+            )),
+            .init(title: "Allergies", content: AnyView(
+                RecordViewerSectionEntries(
+                    title: "Allergies",
+                    columns: ["Date", "Name", "Comment"],
+                    rows: record.allergy
+                        .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+                        .map { [
+                            $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
+                            $0.name,
+                            $0.comment
+                        ] }
+                ).padding(.top, 4)
+            )),
+            .init(title: "Illnesses", content: AnyView(
+                RecordViewerSectionEntries(
+                    title: "Illnesses",
+                    columns: ["Name", "Date", "Comment"],
+                    rows: record.illness
+                        .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+                        .map { [
+                            $0.name,
+                            $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
+                            $0.informationOrComment
+                        ] }
+                ).padding(.top, 4)
+            )),
+            .init(title: "Documents", content: AnyView(
+                RecordViewerSectionEntries(
+                    title: "Documents",
+                    columns: ["Name", "Date", "Note"],
+                    rows: record.medicaldocument
+                        .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+                        .map { [
+                            $0.name,
+                            $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
+                            $0.note
+                        ] }
+                ).padding(.top, 4)
+            )),
+            .init(title: "History", content: AnyView(
+                RecordViewerSectionEntries(
+                    title: "History",
+                    columns: ["Name", "Date", "Contact", "Comment"],
+                    rows: record.medicalhistory
+                        .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+                        .map { [
+                            $0.name,
+                            $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
+                            $0.contact,
+                            $0.informationOrComment
+                        ] }
+                ).padding(.top, 4)
+            )),
+            .init(title: "Risks", content: AnyView(
+                RecordViewerSectionEntries(
+                    title: "Risks",
+                    columns: ["Date", "Name", "Comment"],
+                    rows: record.risks
+                        .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+                        .map { [
+                            $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
+                            $0.name,
+                            $0.descriptionOrComment
+                        ] }
+                ).padding(.top, 4)
+            ))
+        ])
+
+        if record.isPet {
+            pages.append(.init(title: "Costs", content: AnyView(RecordViewerSectionPetYearlyCosts(record: record).padding(.top, 4))))
+        }
+
+        pages.append(.init(title: "Record Details", content: AnyView(RecordViewerSectionDetails(record: record).padding(.top, 4))))
+        return pages
+    }
+
+    private var cardViewer: some View {
+        TabView {
+            ForEach(cardPages) { page in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(page.title)
+                            .font(.title3.weight(.semibold))
+                        page.content
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        }
+        .tabViewStyle(.page(indexDisplayMode: .automatic))
+    }
+
+    // MARK: - List viewer
 
     @ViewBuilder
-    private var viewerForm: some View {
+    private var viewerFormList: some View {
         // A) Personal
         Section { RecordViewerSectionPersonal(record: record) }
 

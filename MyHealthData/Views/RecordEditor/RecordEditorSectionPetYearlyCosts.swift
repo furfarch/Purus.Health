@@ -6,83 +6,55 @@ struct RecordEditorSectionPetYearlyCosts: View {
     @Bindable var record: MedicalRecord
     let onChange: () -> Void
 
-    private var sortedIndices: [Int] {
-        record.petYearlyCosts.indices.sorted { a, b in
-            record.petYearlyCosts[a].date > record.petYearlyCosts[b].date
-        }
+    private var entries: [PetYearlyCostEntry] {
+        Array(record.petYearlyCosts)
     }
 
     var body: some View {
         Section {
             if record.petYearlyCosts.isEmpty {
-                Text("Track pet costs by date and see the yearly total.")
+                Text("Track recurring yearly pet costs (e.g., insurance, food, vet).")
                     .foregroundStyle(.secondary)
             }
 
-            ForEach(sortedIndices, id: \.self) { idx in
-                HStack {
-                    TextField(
-                        "Title (e.g., Vet Check Up)",
-                        text: Binding(
-                            get: { record.petYearlyCosts[idx].title },
-                            set: { record.petYearlyCosts[idx].title = $0; onChange() }
-                        )
-                    )
+            ForEach(entries, id: \.uuid, content: { (entry: PetYearlyCostEntry) in
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text(entry.category)
+                            .font(.headline)
+                        Spacer()
+                        Button(role: .destructive) {
+                            if let index = record.petYearlyCosts.firstIndex(where: { $0.uuid == entry.uuid }) {
+                                let removed = record.petYearlyCosts.remove(at: index)
+                                modelContext.delete(removed)
+                                onChange()
+                            }
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                    }
 
-                    Spacer()
+                    Text("Year: \(entry.year)")
+                        .foregroundStyle(.secondary)
 
-                    Button(role: .destructive) {
-                        let removed = record.petYearlyCosts.remove(at: idx)
-                        modelContext.delete(removed)
-                        onChange()
-                    } label: {
-                        Image(systemName: "trash")
+                    Text("Amount: \(entry.amount, format: .number)")
+                        .foregroundStyle(.secondary)
+
+                    if !entry.note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        Text(entry.note)
+                            .foregroundStyle(.secondary)
                     }
                 }
+                .padding(.vertical, 4)
+            })
 
-                DatePicker(
-                    "Date",
-                    selection: Binding(
-                        get: { record.petYearlyCosts[idx].date },
-                        set: { record.petYearlyCosts[idx].date = $0; onChange() }
-                    ),
-                    displayedComponents: [.date]
-                )
-
-                HStack {
-                    Text("Amount")
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    TextField(
-                        "",
-                        value: Binding(
-                            get: { record.petYearlyCosts[idx].amount },
-                            set: { record.petYearlyCosts[idx].amount = $0; onChange() }
-                        ),
-                        format: .number
-                    )
-                    .keyboardType(.decimalPad)
-                    .multilineTextAlignment(.trailing)
-                }
-
-                TextField(
-                    "Note",
-                    text: Binding(
-                        get: { record.petYearlyCosts[idx].note },
-                        set: { record.petYearlyCosts[idx].note = $0; onChange() }
-                    ),
-                    axis: .vertical
-                )
-                .lineLimit(1...3)
-            }
-
-            Button("Add Cost") {
+            Button("Add Yearly Cost") {
                 let entry = PetYearlyCostEntry(record: record)
                 record.petYearlyCosts.append(entry)
                 onChange()
             }
         } header: {
-            Label("Costs", systemImage: "eurosign.circle")
+            Label("Yearly Costs", systemImage: "eurosign.circle")
         }
     }
 }
