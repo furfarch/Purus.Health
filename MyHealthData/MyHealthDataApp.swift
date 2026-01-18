@@ -69,6 +69,7 @@ struct MyHealthDataApp: App {
                 .task {
                     // Best-effort: trigger import of any pending cloud/shared changes on launch
                     cloudFetcher.fetchChanges()
+                    await fetchSharedRecords()
                 }
         }
         .modelContainer(modelContainer)
@@ -76,7 +77,27 @@ struct MyHealthDataApp: App {
             // Fetch cloud changes when app becomes active to ensure we get updates
             if newPhase == .active {
                 cloudFetcher.fetchChanges()
+                Task { @MainActor in
+                    await fetchSharedRecords()
+                }
             }
+        }
+    }
+    
+    @MainActor
+    private func fetchSharedRecords() async {
+        // Fetch shared records from CloudKit shared database
+        let sharedFetcher = CloudKitSharedZoneMedicalRecordFetcher(
+            containerIdentifier: "iCloud.com.furfarch.MyHealthData",
+            modelContext: modelContainer.mainContext
+        )
+        do {
+            let count = try await sharedFetcher.fetchAllSharedAcrossZonesAsync()
+            if count > 0 {
+                ShareDebugStore.shared.appendLog("MyHealthDataApp: fetched \(count) shared records on activation")
+            }
+        } catch {
+            ShareDebugStore.shared.appendLog("MyHealthDataApp: shared fetch failed: \(error)")
         }
     }
 }
