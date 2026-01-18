@@ -73,6 +73,8 @@ struct MyHealthDataApp: App {
                 .environment(\.modelContext, modelContainer.mainContext)
                 .task {
                     // Best-effort: trigger import of any pending cloud/shared changes on launch
+                    // cloudFetcher.fetchChanges() is fire-and-forget for private CloudKit database
+                    // fetchSharedRecords() fetches and imports from shared CloudKit database
                     cloudFetcher.fetchChanges()
                     await fetchSharedRecords()
                 }
@@ -82,6 +84,9 @@ struct MyHealthDataApp: App {
             // Fetch cloud changes when app becomes active to ensure we get updates
             if newPhase == .active {
                 Task { @MainActor in
+                    // Start both fetchers to update from private and shared CloudKit databases
+                    // cloudFetcher.fetchChanges() is fire-and-forget, starts async operation
+                    // fetchSharedRecords() is awaited to ensure shared records are current
                     cloudFetcher.fetchChanges()
                     await fetchSharedRecords()
                 }
