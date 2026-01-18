@@ -20,6 +20,7 @@ struct MyHealthDataApp: App {
 
     // Keep a single fetcher instance alive for the app lifetime.
     private let cloudFetcher: CloudKitMedicalRecordFetcher
+    private let sharedFetcher: CloudKitSharedZoneMedicalRecordFetcher
 
     init() {
         let schema = Schema([
@@ -58,8 +59,12 @@ struct MyHealthDataApp: App {
             self.modelContainer = try! ModelContainer(for: schema, configurations: [memoryConfig])
         }
 
-        // Ensure the fetcher has the model context so imports can run
+        // Ensure the fetchers have the model context so imports can run
         self.cloudFetcher.setModelContext(self.modelContainer.mainContext)
+        self.sharedFetcher = CloudKitSharedZoneMedicalRecordFetcher(
+            containerIdentifier: "iCloud.com.furfarch.MyHealthData",
+            modelContext: self.modelContainer.mainContext
+        )
     }
 
     var body: some Scene {
@@ -68,9 +73,37 @@ struct MyHealthDataApp: App {
                 .environment(\.modelContext, modelContainer.mainContext)
                 .task {
                     // Best-effort: trigger import of any pending cloud/shared changes on launch
+                    // cloudFetcher.fetchChanges() is fire-and-forget for private CloudKit database
+                    // fetchSharedRecords() fetches and imports from shared CloudKit database
                     cloudFetcher.fetchChanges()
+                    await fetchSharedRecords()
                 }
         }
         .modelContainer(modelContainer)
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            // Fetch cloud changes when app becomes active to ensure we get updates
+            if newPhase == .active {
+                Task { @MainActor in
+                    // Start both fetchers to update from private and shared CloudKit databases
+                    // cloudFetcher.fetchChanges() is fire-and-forget, starts async operation
+                    // fetchSharedRecords() is awaited to ensure shared records are current
+                    cloudFetcher.fetchChanges()
+                    await fetchSharedRecords()
+                }
+            }
+        }
+    }
+    
+    @MainActor
+    private func fetchSharedRecords() async {
+        // Fetch shared records from CloudKit shared database
+        do {
+            let count = try await sharedFetcher.fetchAllSharedAcrossZonesAsync()
+            if count > 0 {
+                ShareDebugStore.shared.appendLog("MyHealthDataApp: fetched \(count) shared records on activation")
+            }
+        } catch {
+            ShareDebugStore.shared.appendLog("MyHealthDataApp: shared fetch failed: \(error)")
+        }
     }
 }
