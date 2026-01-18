@@ -15,7 +15,7 @@ A SwiftUI-based iOS and macOS application for managing personal medical records 
 
 ## Technology Stack
 
-- **Language**: Swift 5.0
+- **Language**: Swift 5.9+
 - **Framework**: SwiftUI
 - **Data Persistence**: SwiftData with CloudKit integration
 - **Testing**: Swift Testing framework

@@ -14,12 +14,17 @@ applyTo: 'MyHealthData/Models/**/*.swift'
 - Provide computed `id` property that returns `uuid` for Identifiable conformance
 
 ### Identity and Timestamps
+
+**Only for MedicalRecord** (not for entry models):
 ```swift
 var createdAt: Date = Date()
 var updatedAt: Date = Date()
 var uuid: String = UUID().uuidString
 var id: String { uuid }
 ```
+
+**For Entry Models** (BloodEntry, DrugEntry, etc.):
+Entry models don't have uuid, id, createdAt, or updatedAt fields. They only have their domain-specific properties.
 
 ### Relationships
 - Use `@Relationship` macro for all relationships
@@ -35,32 +40,31 @@ var id: String { uuid }
 
 ## Example Model Structure
 
+### Entry Model Pattern (BloodEntry, DrugEntry, etc.)
+
 ```swift
 import Foundation
 import SwiftData
 
 @Model
 final class ExampleEntry {
-    var uuid: String
-    var id: String { uuid }
-    var createdAt: Date
-    var updatedAt: Date
-    
-    var name: String
-    var notes: String
+    var date: Date? = nil
+    var name: String = ""
+    var notes: String = ""
     
     @Relationship(deleteRule: .nullify, inverse: \MedicalRecord.exampleEntries)
-    var record: MedicalRecord?
+    var record: MedicalRecord? = nil
     
-    init() {
-        self.uuid = UUID().uuidString
-        self.createdAt = Date()
-        self.updatedAt = Date()
-        self.name = ""
-        self.notes = ""
+    init(date: Date? = nil, name: String = "", notes: String = "", record: MedicalRecord? = nil) {
+        self.date = date
+        self.name = name
+        self.notes = notes
+        self.record = record
     }
 }
 ```
+
+**Important**: Entry models don't have uuid, id, createdAt, or updatedAt fields. Only `MedicalRecord` has these identity fields.
 
 ## Don't
 

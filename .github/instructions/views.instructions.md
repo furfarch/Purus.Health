@@ -50,20 +50,27 @@ For views with bindings:
 
 ## Conditional Rendering
 
-Account for both human and pet records:
-```swift
-if record.isPet {
-    // Pet-specific UI
-    Text(record.personalName)
-} else {
-    // Human-specific UI
-    Text("\(record.personalGivenName) \(record.personalFamilyName)")
-}
-```
+Account for both human and pet records using the `displayName` computed property:
 
-Or use the computed property:
 ```swift
+// Simple usage - recommended
 Text(record.displayName)
+
+// Manual construction if needed
+if record.isPet {
+    Text(record.personalName.isEmpty ? "Pet" : record.personalName)
+} else {
+    // Displays as "family - given - nickname" with non-empty parts
+    let parts = [
+        record.personalFamilyName,
+        record.personalGivenName,
+        record.personalNickName
+    ]
+    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+    .filter { !$0.isEmpty }
+    
+    Text(parts.isEmpty ? "Person" : parts.joined(separator: " - "))
+}
 ```
 
 ## Do

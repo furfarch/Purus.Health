@@ -10,7 +10,7 @@ MyHealthData is a SwiftUI-based iOS/macOS application for managing personal medi
 
 ## Technology Stack
 
-- **Language**: Swift 5.0
+- **Language**: Swift 5.9+
 - **Framework**: SwiftUI
 - **Data Persistence**: SwiftData with CloudKit integration
 - **Testing**: Swift Testing framework (using `@Test` macro)
@@ -179,24 +179,30 @@ MyHealthData/
 
 ## Common Code Patterns
 
-### Creating a New Model
+### Creating a New Entry Model
+
+Entry models (BloodEntry, DrugEntry, etc.) follow a simple pattern without uuid/id fields:
 
 ```swift
 @Model
 final class NewEntry {
-    var uuid: String = UUID().uuidString
-    var id: String { uuid }
-    var createdAt: Date = Date()
+    var date: Date? = nil
+    var name: String = ""
+    var notes: String = ""
     
     @Relationship(deleteRule: .nullify, inverse: \MedicalRecord.newEntries)
-    var record: MedicalRecord?
+    var record: MedicalRecord? = nil
     
-    init() {
-        self.uuid = UUID().uuidString
-        self.createdAt = Date()
+    init(date: Date? = nil, name: String = "", notes: String = "", record: MedicalRecord? = nil) {
+        self.date = date
+        self.name = name
+        self.notes = notes
+        self.record = record
     }
 }
 ```
+
+**Note**: Only `MedicalRecord` has uuid, id, createdAt, and updatedAt fields. Entry models don't need these.
 
 ### Creating a SwiftUI View with ModelContext
 
