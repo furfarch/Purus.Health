@@ -72,5 +72,11 @@ struct MyHealthDataApp: App {
                 }
         }
         .modelContainer(modelContainer)
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            // Fetch cloud changes when app becomes active to ensure we get updates
+            if newPhase == .active {
+                cloudFetcher.fetchChanges()
+            }
+        }
     }
 }

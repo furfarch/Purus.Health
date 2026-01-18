@@ -10,10 +10,12 @@ import SwiftData
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
 
     // Show alert when a share is accepted and imported
     @State private var showShareAcceptedAlert: Bool = false
     @State private var importedName: String = ""
+    @State private var hasCheckedPendingURL: Bool = false
 
     var body: some View {
         RecordListView()
@@ -21,6 +23,18 @@ struct ContentView: View {
                 // Accept CloudKit share links and import shared records.
                 Task { @MainActor in
                     await CloudKitShareAcceptanceService.shared.acceptShare(from: url, modelContext: modelContext)
+                }
+            }
+            .task {
+                // Check for pending share URL on first appearance
+                await checkPendingShareURL()
+            }
+            .onChange(of: scenePhase) { oldPhase, newPhase in
+                // Check for pending share URL when app becomes active
+                if newPhase == .active {
+                    Task { @MainActor in
+                        await checkPendingShareURL()
+                    }
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("MyHealthData.DidAcceptShare"))) { notif in
@@ -60,6 +74,17 @@ struct ContentView: View {
             } message: {
                 Text("\(importedName) imported")
             }
+    }
+    
+    @MainActor
+    private func checkPendingShareURL() async {
+        #if canImport(UIKit)
+        // Check if there's a pending share URL from the AppDelegate
+        if let pendingURL = PendingShareStore.shared.consume() {
+            ShareDebugStore.shared.appendLog("ContentView: processing pending share URL from AppDelegate")
+            await CloudKitShareAcceptanceService.shared.acceptShare(from: pendingURL, modelContext: modelContext)
+        }
+        #endif
     }
 }
 
