@@ -220,8 +220,17 @@ private enum CloudKitSharedImporter {
             }
         }
 
+        // Process pending changes before saving to ensure all modifications are tracked
+        modelContext.processPendingChanges()
+
         do {
             try modelContext.save()
+            ShareDebugStore.shared.appendLog("CloudKitSharedImporter: successfully saved \(ckRecords.count) record(s)")
+            
+            // Post notification to trigger UI refresh
+            Task { @MainActor in
+                NotificationCenter.default.post(name: Notification.Name("MyHealthData.DidImportRecords"), object: nil)
+            }
         } catch {
             ShareDebugStore.shared.appendLog("CloudKitSharedImporter: failed saving import: \(error)")
         }

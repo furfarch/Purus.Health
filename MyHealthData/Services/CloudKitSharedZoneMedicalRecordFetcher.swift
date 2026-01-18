@@ -149,8 +149,17 @@ final class CloudKitSharedZoneMedicalRecordFetcher {
             }
         }
 
+        // Process pending changes before saving to ensure all modifications are tracked
+        context.processPendingChanges()
+
         do {
             try context.save()
+            ShareDebugStore.shared.appendLog("CloudKitSharedZoneMedicalRecordFetcher: successfully saved \(records.count) record(s)")
+            
+            // Post notification to trigger UI refresh
+            Task { @MainActor in
+                NotificationCenter.default.post(name: Notification.Name("MyHealthData.DidImportRecords"), object: nil)
+            }
         } catch {
             ShareDebugStore.shared.appendLog("CloudKitSharedZoneMedicalRecordFetcher: failed saving import: \(error)")
         }

@@ -15,14 +15,21 @@ struct RecordListView: View {
     @State private var showAbout: Bool = false
     @State private var showSettings: Bool = false
     @State private var saveErrorMessage: String?
+    @State private var refreshID = UUID()
 
     var body: some View {
         NavigationStack {
             List {
                 listContent
             }
+            .id(refreshID)
             .refreshable {
                 await refreshFromCloud()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("MyHealthData.DidImportRecords"))) { _ in
+                // Force a refresh when records are imported from CloudKit
+                ShareDebugStore.shared.appendLog("RecordListView: received DidImportRecords notification, refreshing UI")
+                refreshID = UUID()
             }
             .navigationTitle("MyHealthData")
             .toolbar {
