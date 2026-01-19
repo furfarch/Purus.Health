@@ -10,4 +10,7 @@ enum NotificationNames {
     
     /// Posted when shared records need to be refreshed
     static let didChangeSharedRecords = Notification.Name("MyHealthData.DidChangeSharedRecords")
+
+    /// Posted when a share URL is received (pending) — used to notify the UI to accept/import it
+    static let pendingShareReceived = Notification.Name("MyHealthData.PendingShareReceived")
 }

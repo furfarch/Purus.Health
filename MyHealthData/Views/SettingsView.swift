@@ -3,19 +3,12 @@ import CloudKit
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var modelContext
     @State private var accountStatus: CKAccountStatus?
     @State private var accountStatusError: String?
 
     // Export UI state
     @State private var showExportSheet: Bool = false
     @State private var exportItems: [Any] = []
-
-    // Import Share URL state
-    @State private var importShareURL: String = ""
-    @State private var isImportingShare: Bool = false
-    @State private var importResultMessage: String?
-    @State private var showImportResultAlert: Bool = false
 
     private let containerIdentifier = "iCloud.com.furfarch.MyHealthData"
 
@@ -87,47 +80,6 @@ struct SettingsView: View {
                     }) {
                         Label("Export Share Logs", systemImage: "square.and.arrow.up.on.square")
                     }
-
-                    // Import Share URL UI (minimal)
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Import Share URL")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-
-                        TextField("Paste iCloud share URL here", text: $importShareURL)
-                            .textInputAutocapitalization(.never)
-                            .disableAutocorrection(true)
-
-                        HStack {
-                            Button(action: {
-                                guard !importShareURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                                      let url = URL(string: importShareURL.trimmingCharacters(in: .whitespacesAndNewlines)) else {
-                                    importResultMessage = "Invalid URL"
-                                    showImportResultAlert = true
-                                    return
-                                }
-
-                                isImportingShare = true
-                                Task { @MainActor in
-                                    await CloudKitShareAcceptanceService.shared.acceptShare(from: url, modelContext: modelContext)
-                                    isImportingShare = false
-                                    importResultMessage = "Imported (check logs for details)"
-                                    showImportResultAlert = true
-                                }
-                            }) {
-                                if isImportingShare {
-                                    ProgressView()
-                                } else {
-                                    Text("Import")
-                                }
-                            }
-
-                            Button("Clear") {
-                                importShareURL = ""
-                            }
-                            .foregroundStyle(.secondary)
-                        }
-                    }
                 }
             }
             .navigationTitle("Settings")
@@ -139,9 +91,6 @@ struct SettingsView: View {
                     .onAppear {
                         ShareDebugStore.shared.appendLog("Export sheet presented (items=\(exportItems.count))")
                     }
-            }
-            .alert(importResultMessage ?? "", isPresented: $showImportResultAlert) {
-                Button("OK", role: .cancel) {}
             }
             .toolbar {
                 #if os(macOS)

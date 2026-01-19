@@ -64,10 +64,12 @@ struct MyHealthDataApp: App {
                 .task {
                     // Best-effort: trigger import of any pending cloud/shared changes on launch
                     cloudFetcher.fetchChanges()
-
-                    // If the app received a share URL before the SwiftUI scene was ready, accept it now.
-                    if let pending = PendingShareStore.shared.consume() {
-                        await CloudKitShareAcceptanceService.shared.acceptShare(from: pending, modelContext: modelContainer.mainContext)
+                }
+                .onReceive(NotificationCenter.default.publisher(for: NotificationNames.pendingShareReceived)) { _ in
+                    if let url = PendingShareStore.shared.consume() {
+                        Task { @MainActor in
+                            await CloudKitShareAcceptanceService.shared.acceptShare(from: url, modelContext: modelContainer.mainContext)
+                        }
                     }
                 }
         }

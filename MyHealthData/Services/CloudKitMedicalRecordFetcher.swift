@@ -148,18 +148,8 @@ class CloudKitMedicalRecordFetcher: ObservableObject {
             }
         }
 
-        context.processPendingChanges()
-
         do {
             try context.save()
-            if !recordIDs.isEmpty {
-                ShareDebugStore.shared.appendLog("CloudKitMedicalRecordFetcher: successfully deleted \(recordIDs.count) record(s)")
-                
-                // Post notification to trigger UI refresh (ensure on MainActor for thread safety)
-                Task { @MainActor in
-                    NotificationCenter.default.post(name: NotificationNames.didImportRecords, object: nil)
-                }
-            }
         } catch {
             ShareDebugStore.shared.appendLog("CloudKitMedicalRecordFetcher: failed saving deletions: \(error)")
         }
@@ -271,17 +261,10 @@ class CloudKitMedicalRecordFetcher: ObservableObject {
 
             // Prevent stale cloud copies from overwriting newer local edits.
             if let existing, existing.updatedAt > cloudUpdatedAt {
-                ShareDebugStore.shared.appendLog("CloudKitMedicalRecordFetcher: skipping stale cloud record uuid=\(uuid) (local=\(existing.updatedAt), cloud=\(cloudUpdatedAt))")
                 continue
             }
 
             let record = existing ?? MedicalRecord(uuid: uuid)
-            
-            if existing != nil {
-                ShareDebugStore.shared.appendLog("CloudKitMedicalRecordFetcher: updating existing record uuid=\(uuid)")
-            } else {
-                ShareDebugStore.shared.appendLog("CloudKitMedicalRecordFetcher: creating new record uuid=\(uuid)")
-            }
 
             record.createdAt = ckRecord["createdAt"] as? Date ?? record.createdAt
             record.updatedAt = cloudUpdatedAt
@@ -313,29 +296,32 @@ class CloudKitMedicalRecordFetcher: ObservableObject {
             record.emergencyEmail = ckRecord["emergencyEmail"] as? String ?? ""
 
             // Respect global iCloud toggle. Importing should not auto-enable cloud for the user.
-            let cloudEnabled = UserDefaults.standard.bool(forKey: "cloudEnabled")
-            record.isCloudEnabled = cloudEnabled
+            // If this import is from the share zone, treat it as a shared record and mark it enabled for cloud and sharing
+            let isFromShareZone = (ckRecord.recordID.zoneID == self.shareZoneID)
+            if isFromShareZone {
+                record.isCloudEnabled = true
+                record.isSharingEnabled = true
+            } else {
+                let cloudEnabled = UserDefaults.standard.bool(forKey: "cloudEnabled")
+                record.isCloudEnabled = cloudEnabled
+            }
             record.cloudRecordName = ckRecord.recordID.recordName
+
+            if let shareRef = ckRecord.share {
+                record.cloudShareRecordName = shareRef.recordID.recordName
+            }
+
+            ShareDebugStore.shared.appendLog("CloudKitMedicalRecordFetcher: importing record uuid=\(uuid) recordName=\(ckRecord.recordID.recordName) fromShareZone=\(isFromShareZone)")
 
             if existing == nil {
                 context.insert(record)
             }
         }
 
-        // Process pending changes before saving to ensure all modifications are tracked
-        context.processPendingChanges()
-
         do {
             try context.save()
-            ShareDebugStore.shared.appendLog("CloudKitMedicalRecordFetcher: successfully imported \(records.count) record(s) into local store")
-            
-            // Post notification to trigger UI refresh (ensure on MainActor for thread safety)
-            Task { @MainActor in
-                NotificationCenter.default.post(name: NotificationNames.didImportRecords, object: nil)
-            }
         } catch {
             print("Failed to save CloudKit import: \(error)")
-            ShareDebugStore.shared.appendLog("CloudKitMedicalRecordFetcher: failed to save import: \(error)")
         }
     }
 
