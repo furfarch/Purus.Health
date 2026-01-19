@@ -17,11 +17,11 @@ struct RecordEditorSectionPersonal: View {
             } header: {
                 Label("Pet Information", systemImage: "pawprint")
             }
-            .onChange(of: record.personalName) { _, _ in onChange() }
-            .onChange(of: record.personalAnimalID) { _, _ in onChange() }
-            .onChange(of: record.ownerName) { _, _ in onChange() }
-            .onChange(of: record.ownerPhone) { _, _ in onChange() }
-            .onChange(of: record.ownerEmail) { _, _ in onChange() }
+            .onChange(of: record.personalName) { onChange() }
+            .onChange(of: record.personalAnimalID) { onChange() }
+            .onChange(of: record.ownerName) { onChange() }
+            .onChange(of: record.ownerPhone) { onChange() }
+            .onChange(of: record.ownerEmail) { onChange() }
         } else {
             Section {
                 TextField("Family Name", text: $record.personalFamilyName)
@@ -48,16 +48,16 @@ struct RecordEditorSectionPersonal: View {
             } header: {
                 Label("Personal Information", systemImage: "person.text.rectangle")
             }
-            .onChange(of: record.personalFamilyName) { _, _ in onChange() }
-            .onChange(of: record.personalGivenName) { _, _ in onChange() }
-            .onChange(of: record.personalNickName) { _, _ in onChange() }
-            .onChange(of: record.personalGender) { _, _ in onChange() }
-            .onChange(of: record.personalBirthdate) { _, _ in onChange() }
-            .onChange(of: record.personalSocialSecurityNumber) { _, _ in onChange() }
-            .onChange(of: record.personalAddress) { _, _ in onChange() }
-            .onChange(of: record.personalHealthInsurance) { _, _ in onChange() }
-            .onChange(of: record.personalHealthInsuranceNumber) { _, _ in onChange() }
-            .onChange(of: record.personalEmployer) { _, _ in onChange() }
+            .onChange(of: record.personalFamilyName) { onChange() }
+            .onChange(of: record.personalGivenName) { onChange() }
+            .onChange(of: record.personalNickName) { onChange() }
+            .onChange(of: record.personalGender) { onChange() }
+            .onChange(of: record.personalBirthdate) { onChange() }
+            .onChange(of: record.personalSocialSecurityNumber) { onChange() }
+            .onChange(of: record.personalAddress) { onChange() }
+            .onChange(of: record.personalHealthInsurance) { onChange() }
+            .onChange(of: record.personalHealthInsuranceNumber) { onChange() }
+            .onChange(of: record.personalEmployer) { onChange() }
         }
     }
 }

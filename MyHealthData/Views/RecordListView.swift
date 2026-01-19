@@ -97,7 +97,7 @@ struct RecordListView: View {
                 }
                 #endif
             }
-            .sheet(item: $activeRecord, onDismiss: { activeRecord = nil }) { record in
+            .sheet(item: $activeRecord, onDismiss: { activeRecord = nil; startEditing = false }) { record in
                 NavigationStack {
                     RecordEditorView(record: record, startEditing: startEditing)
                 }

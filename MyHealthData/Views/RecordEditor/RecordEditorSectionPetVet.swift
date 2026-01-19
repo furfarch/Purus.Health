@@ -28,12 +28,12 @@ struct RecordEditorSectionPetVet: View {
         } header: {
             Label("Veterinarian", systemImage: "stethoscope.circle")
         }
-        .onChange(of: record.vetClinicName) { _, _ in onChange() }
-        .onChange(of: record.vetContactName) { _, _ in onChange() }
-        .onChange(of: record.vetPhone) { _, _ in onChange() }
-        .onChange(of: record.vetEmail) { _, _ in onChange() }
-        .onChange(of: record.vetAddress) { _, _ in onChange() }
-        .onChange(of: record.vetNote) { _, _ in onChange() }
+        .onChange(of: record.vetClinicName) { onChange() }
+        .onChange(of: record.vetContactName) { onChange() }
+        .onChange(of: record.vetPhone) { onChange() }
+        .onChange(of: record.vetEmail) { onChange() }
+        .onChange(of: record.vetAddress) { onChange() }
+        .onChange(of: record.vetNote) { onChange() }
     }
 
     private func apply(contact: ContactPickerResult) {

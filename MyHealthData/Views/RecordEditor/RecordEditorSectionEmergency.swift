@@ -51,8 +51,8 @@ struct RecordEditorSectionEmergency: View {
         } header: {
             Label("Emergency Information", systemImage: "cross.case")
         }
-        .onChange(of: record.emergencyName) { _, _ in onChange() }
-        .onChange(of: record.emergencyNumber) { _, _ in onChange() }
-        .onChange(of: record.emergencyEmail) { _, _ in onChange() }
+        .onChange(of: record.emergencyName) { onChange() }
+        .onChange(of: record.emergencyNumber) { onChange() }
+        .onChange(of: record.emergencyEmail) { onChange() }
     }
 }

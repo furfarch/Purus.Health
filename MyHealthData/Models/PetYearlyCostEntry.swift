@@ -3,26 +3,30 @@ import SwiftData
 
 @Model
 final class PetYearlyCostEntry {
-    var createdAt: Date = Date()
-    var updatedAt: Date = Date()
+    var createdAt: Date
+    var updatedAt: Date
 
     // Local stable identifier
-    var uuid: String = UUID().uuidString
+    var uuid: String
     var id: String { uuid }
 
-    var year: Int = Calendar.current.component(.year, from: Date())
-    var category: String = ""
-    var amount: Double = 0
-    var note: String = ""
+    // Transaction date and derived year
+    var date: Date
+    var year: Int
+
+    var category: String
+    var amount: Double
+    var note: String
 
     // Inverse is declared on MedicalRecord.petYearlyCosts.
-    var record: MedicalRecord? = nil
+    var record: MedicalRecord?
 
     init(
         uuid: String = UUID().uuidString,
         createdAt: Date = Date(),
         updatedAt: Date = Date(),
-        year: Int = Calendar.current.component(.year, from: Date()),
+        date: Date = Date(),
+        year: Int? = nil,
         category: String = "",
         amount: Double = 0,
         note: String = "",
@@ -31,7 +35,9 @@ final class PetYearlyCostEntry {
         self.uuid = uuid
         self.createdAt = createdAt
         self.updatedAt = updatedAt
-        self.year = year
+        self.date = date
+        // If year is provided use it, otherwise derive from date
+        self.year = year ?? Calendar.current.component(.year, from: date)
         self.category = category
         self.amount = amount
         self.note = note
