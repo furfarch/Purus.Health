@@ -14,9 +14,9 @@ final class CloudKitSharedZoneMedicalRecordFetcher {
     private var modelContext: ModelContext?
 
     // Keep in sync with the owner's record type.
-    private let recordType = "MedicalRecord"
+    private let recordType = AppConfig.CloudKit.recordType
 
-    init(containerIdentifier: String = "iCloud.com.furfarch.MyHealthData", modelContext: ModelContext? = nil) {
+    init(containerIdentifier: String = AppConfig.CloudKit.containerID, modelContext: ModelContext? = nil) {
         self.container = CKContainer(identifier: containerIdentifier)
         self.database = container.sharedCloudDatabase
         self.modelContext = modelContext

@@ -197,12 +197,12 @@ struct RecordListView: View {
         let wantsCloudRefresh = allRecords.contains(where: { $0.isCloudEnabled || $0.locationStatus == .shared })
         guard wantsCloudRefresh else { return }
 
-        let fetcher = CloudKitMedicalRecordFetcher(containerIdentifier: "iCloud.com.furfarch.MyHealthData", modelContext: modelContext)
+        let fetcher = CloudKitMedicalRecordFetcher(containerIdentifier: AppConfig.CloudKit.containerID, modelContext: modelContext)
         fetcher.fetchChanges()
 
         // Also pull shared records (if any) so changes from others can appear.
         do {
-            let sharedFetcher = CloudKitSharedMedicalRecordFetcher(containerIdentifier: "iCloud.com.furfarch.MyHealthData", modelContext: modelContext)
+            let sharedFetcher = CloudKitSharedMedicalRecordFetcher(containerIdentifier: AppConfig.CloudKit.containerID, modelContext: modelContext)
             _ = try await sharedFetcher.fetchAllSharedAsync()
         } catch {
             // Best-effort; don't fail refresh UI.

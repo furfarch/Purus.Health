@@ -1,6 +1,6 @@
 //
-//  MyHealthDataApp.swift
-//  MyHealthData
+//  SimplyHealthApp.swift
+//  Simply Health
 //
 //  Created by Chris Furfari on 05.01.2026.
 //
@@ -9,7 +9,7 @@ import SwiftUI
 import SwiftData
 
 @main
-struct MyHealthDataApp: App {
+struct SimplyHealthApp: App {
     private let modelContainer: ModelContainer
     @Environment(\.scenePhase) private var scenePhase: ScenePhase
 
@@ -39,7 +39,7 @@ struct MyHealthDataApp: App {
             cloudKitDatabase: .none
         )
 
-        self.cloudFetcher = CloudKitMedicalRecordFetcher(containerIdentifier: "iCloud.com.furfarch.MyHealthData")
+        self.cloudFetcher = CloudKitMedicalRecordFetcher(containerIdentifier: AppConfig.CloudKit.containerID)
 
         do {
             self.modelContainer = try ModelContainer(for: schema, configurations: [localConfig])

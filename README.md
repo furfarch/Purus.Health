@@ -1,10 +1,12 @@
-# MyHealthData
+# Simply Health
+
+**Part of the Simply Series** - Minimalist apps focused on one tracking task at a time.
 
 A SwiftUI-based iOS and macOS application for managing personal medical records with CloudKit integration for cloud synchronization and sharing.
 
 ## Overview
 
-MyHealthData helps you keep track of your medical information and that of your pets in one secure, private application. All data is stored locally on your device using SwiftData, with optional CloudKit synchronization for backup and sharing across devices.
+Simply Health helps you keep track of your medical information and that of your pets in one secure, private application. All data is stored locally on your device using SwiftData, with optional CloudKit synchronization for backup and sharing across devices.
 
 ## Features
 
@@ -51,13 +53,13 @@ MyHealthData helps you keep track of your medical information and that of your p
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/furfarch/MyHealthData.git
-   cd MyHealthData
+   git clone https://github.com/furfarch/SimplyHealth.git
+   cd SimplyHealth
    ```
 
 2. Open the project in Xcode:
    ```bash
-   open MyHealthData.xcodeproj
+   open SimplyHealth.xcodeproj
    ```
 
 3. Select your target device (iOS Simulator, iPad Simulator, or My Mac)
@@ -69,29 +71,30 @@ MyHealthData helps you keep track of your medical information and that of your p
 Tests use the Swift Testing framework. To run tests:
 
 1. In Xcode, open the Test Navigator (⌘6)
-2. Click the play button next to "MyHealthDataTests"
+2. Click the play button next to "SimplyHealthTests"
 3. Or use the keyboard shortcut (⌘U)
 
 ## Project Structure
 
 ```
-MyHealthData/
-├── MyHealthData/
+SimplyHealth/
+├── SimplyHealth/
 │   ├── Models/              # SwiftData model definitions
 │   ├── Views/               # SwiftUI views
 │   │   ├── RecordEditor/    # Record editing views
 │   │   └── RecordViewer/    # Record viewing views
 │   ├── Services/            # Business logic and services
+│   ├── AppConfig.swift      # Centralized configuration
 │   └── Assets.xcassets      # Asset catalog
-├── MyHealthDataTests/       # Unit tests
-└── MyHealthDataUITests/     # UI tests
+├── SimplyHealthTests/       # Unit tests
+└── SimplyHealthUITests/     # UI tests
 ```
 
 ## CloudKit Integration
 
 CloudKit features are opt-in per record:
 
-- **Container ID**: `iCloud.com.furfarch.MyHealthData`
+- **Container ID**: `iCloud.com.furfarch.SimplyHealth`
 - **Features**:
   - Private database for personal records
   - Shared database for records shared with others
@@ -125,6 +128,21 @@ To enable CloudKit for a record:
 - Contact management
 - Share management
 
+## Simply Series Apps
+
+Simply Health is part of a family of minimalist tracking apps:
+
+- **Simply Drive** - Vehicle tracking, drive logs, and maintenance checklists
+- **Simply Health** - Medical records and health tracking for humans and pets
+- **Simply Train** - Workout and training tracker (coming soon)
+
+Each app in the Simply Series follows the same design principles:
+- Minimalist approach with essential features only
+- Fast data entry and retrieval
+- Clean, intuitive interfaces
+- Focused scope - one problem solved comprehensively
+- Consistent architecture across all apps
+
 ## Contributing
 
 This is a personal project, but suggestions and feedback are welcome. Please open an issue to discuss potential changes.
@@ -135,6 +153,7 @@ This is a personal project, but suggestions and feedback are welcome. Please ope
 - CloudKit integration is optional and user-controlled
 - No third-party analytics or tracking
 - Full control over data sharing
+- iOS hardware encryption protects your data
 
 ## License
 

@@ -42,7 +42,7 @@ struct AboutView: View {
 
     private func refreshICloudStatus() async {
         do {
-            let status = try await CKContainer(identifier: "iCloud.com.furfarch.MyHealthData").accountStatus()
+            let status = try await CKContainer(identifier: AppConfig.CloudKit.containerID).accountStatus()
             accountStatusText = mapAccountStatus(status)
         } catch {
             accountStatusText = "Check failed: \(error.localizedDescription)"

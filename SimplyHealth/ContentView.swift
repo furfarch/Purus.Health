@@ -1,6 +1,6 @@
 //
 //  ContentView.swift
-//  MyHealthData
+//  Simply Health
 //
 //  Created by Chris Furfari on 05.01.2026.
 //
@@ -50,7 +50,7 @@ struct ContentView: View {
 
                 // Ensure shared-zone fetch runs and imports any related records
                 Task { @MainActor in
-                    let sharedFetcher = CloudKitSharedZoneMedicalRecordFetcher(containerIdentifier: "iCloud.com.furfarch.MyHealthData", modelContext: modelContext)
+                    let sharedFetcher = CloudKitSharedZoneMedicalRecordFetcher(containerIdentifier: AppConfig.CloudKit.containerID, modelContext: modelContext)
                     do {
                         _ = try await sharedFetcher.fetchAllSharedAcrossZonesAsync()
                         ShareDebugStore.shared.appendLog("ContentView: triggered shared-zone fetch after accept")
@@ -65,7 +65,7 @@ struct ContentView: View {
             .onReceive(NotificationCenter.default.publisher(for: NotificationNames.didChangeSharedRecords)) { _ in
                 // Another component requested a UI refresh for shared records - perform a shared-zone fetch
                 Task { @MainActor in
-                    let sharedFetcher = CloudKitSharedZoneMedicalRecordFetcher(containerIdentifier: "iCloud.com.furfarch.MyHealthData", modelContext: modelContext)
+                    let sharedFetcher = CloudKitSharedZoneMedicalRecordFetcher(containerIdentifier: AppConfig.CloudKit.containerID, modelContext: modelContext)
                     do {
                         _ = try await sharedFetcher.fetchAllSharedAcrossZonesAsync()
                         ShareDebugStore.shared.appendLog("ContentView: triggered shared-zone fetch for DidChangeSharedRecords")

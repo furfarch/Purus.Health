@@ -12,11 +12,11 @@ class CloudKitMedicalRecordFetcher: ObservableObject {
 
     private let container: CKContainer
     private let database: CKDatabase
-    private let recordType = "MedicalRecord"
+    private let recordType = AppConfig.CloudKit.recordType
     private var modelContext: ModelContext?
 
     // Keep in sync with CloudSyncService.shareZoneName
-    private let shareZoneName = "MyHealthDataShareZone"
+    private let shareZoneName = AppConfig.CloudKit.shareZoneName
     private var shareZoneID: CKRecordZone.ID {
         CKRecordZone.ID(zoneName: shareZoneName, ownerName: CKCurrentUserDefaultName)
     }

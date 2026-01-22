@@ -10,7 +10,7 @@ struct SettingsView: View {
     @State private var showExportSheet: Bool = false
     @State private var exportItems: [Any] = []
 
-    private let containerIdentifier = "iCloud.com.furfarch.MyHealthData"
+    private let containerIdentifier = AppConfig.CloudKit.containerID
 
     // Display settings
     @AppStorage("recordViewerStyle") private var viewerStyle: String = "cards"

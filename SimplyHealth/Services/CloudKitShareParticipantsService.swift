@@ -6,11 +6,11 @@ import CloudKit
 final class CloudKitShareParticipantsService {
     static let shared = CloudKitShareParticipantsService()
 
-    private let containerIdentifier = "iCloud.com.furfarch.MyHealthData"
+    private let containerIdentifier = AppConfig.CloudKit.containerID
     private var container: CKContainer { CKContainer(identifier: containerIdentifier) }
 
     // Keep in sync with CloudSyncService.shareZoneName
-    private let shareZoneName = "MyHealthDataShareZone"
+    private let shareZoneName = AppConfig.CloudKit.shareZoneName
     private var shareZoneID: CKRecordZone.ID {
         CKRecordZone.ID(zoneName: shareZoneName, ownerName: CKCurrentUserDefaultName)
     }

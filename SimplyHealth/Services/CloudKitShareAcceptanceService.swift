@@ -7,7 +7,7 @@ import SwiftData
 final class CloudKitShareAcceptanceService {
     static let shared = CloudKitShareAcceptanceService()
 
-    private let containerIdentifier = "iCloud.com.furfarch.MyHealthData"
+    private let containerIdentifier = AppConfig.CloudKit.containerID
     private var container: CKContainer { CKContainer(identifier: containerIdentifier) }
 
     private init() {}

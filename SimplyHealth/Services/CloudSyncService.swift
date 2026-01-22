@@ -15,10 +15,10 @@ import UIKit
 final class CloudSyncService {
     static let shared = CloudSyncService()
 
-    private let containerIdentifier = "iCloud.com.furfarch.MyHealthData"
+    private let containerIdentifier = AppConfig.CloudKit.containerID
 
     // Shares can't exist in the default zone. Use a dedicated private zone for shareable records.
-    private let shareZoneName = "MyHealthDataShareZone"
+    private let shareZoneName = AppConfig.CloudKit.shareZoneName
     private var shareZoneID: CKRecordZone.ID {
         CKRecordZone.ID(zoneName: shareZoneName, ownerName: CKCurrentUserDefaultName)
     }
