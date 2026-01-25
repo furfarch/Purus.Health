@@ -7,13 +7,19 @@ import SwiftData
 final class CloudKitSharedMedicalRecordFetcher {
     private let container: CKContainer
     private let database: CKDatabase
-    private let recordType = AppConfig.CloudKit.recordType
+    private let recordType: String
     private var modelContext: ModelContext?
 
-    init(containerIdentifier: String = AppConfig.CloudKit.containerID, modelContext: ModelContext? = nil) {
+    init(containerIdentifier: String, modelContext: ModelContext? = nil) {
         self.container = CKContainer(identifier: containerIdentifier)
         self.database = container.sharedCloudDatabase
         self.modelContext = modelContext
+        self.recordType = AppConfig.CloudKit.recordType
+    }
+
+    @MainActor
+    convenience init(modelContext: ModelContext? = nil) {
+        self.init(containerIdentifier: AppConfig.CloudKit.containerID, modelContext: modelContext)
     }
 
     func setModelContext(_ context: ModelContext) {

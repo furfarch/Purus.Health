@@ -16,10 +16,14 @@ final class CloudKitSharedZoneMedicalRecordFetcher {
     // Keep in sync with the owner's record type.
     private let recordType = AppConfig.CloudKit.recordType
 
-    init(containerIdentifier: String = AppConfig.CloudKit.containerID, modelContext: ModelContext? = nil) {
+    init(containerIdentifier: String, modelContext: ModelContext? = nil) {
         self.container = CKContainer(identifier: containerIdentifier)
         self.database = container.sharedCloudDatabase
         self.modelContext = modelContext
+    }
+
+    convenience init(modelContext: ModelContext? = nil) {
+        self.init(containerIdentifier: AppConfig.CloudKit.containerID, modelContext: modelContext)
     }
 
     func setModelContext(_ context: ModelContext) {

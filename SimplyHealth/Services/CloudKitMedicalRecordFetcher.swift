@@ -24,8 +24,9 @@ class CloudKitMedicalRecordFetcher: ObservableObject {
     // Persist the server change token so we can fetch incremental changes.
     private let changeTokenDefaultsKey = "CloudKitMedicalRecordFetcher.shareZoneChangeToken"
 
-    init(containerIdentifier: String = AppConfig.CloudKit.containerID, modelContext: ModelContext? = nil) {
-        self.container = CKContainer(identifier: containerIdentifier)
+    init(containerIdentifier: String? = nil, modelContext: ModelContext? = nil) {
+        let resolvedIdentifier = containerIdentifier ?? AppConfig.CloudKit.containerID
+        self.container = CKContainer(identifier: resolvedIdentifier)
         self.database = container.privateCloudDatabase
         self.modelContext = modelContext
     }
@@ -338,3 +339,4 @@ class CloudKitMedicalRecordFetcher: ObservableObject {
         UserDefaults.standard.removeObject(forKey: changeTokenDefaultsKey)
     }
 }
+
