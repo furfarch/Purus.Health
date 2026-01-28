@@ -53,13 +53,13 @@ Purus Health helps you keep track of your medical information and that of your p
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/furfarch/SimplyHealth.git
-   cd SimplyHealth
+   git clone https://github.com/furfarch/Purus.Health.git
+   cd Purus.Health
    ```
 
 2. Open the project in Xcode:
    ```bash
-   open SimplyHealth.xcodeproj
+   open PurusHealth.xcodeproj
    ```
 
 3. Select your target device (iOS Simulator, iPad Simulator, or My Mac)
@@ -71,14 +71,14 @@ Purus Health helps you keep track of your medical information and that of your p
 Tests use the Swift Testing framework. To run tests:
 
 1. In Xcode, open the Test Navigator (⌘6)
-2. Click the play button next to "SimplyHealthTests"
+2. Click the play button next to "PurusHealthTests"
 3. Or use the keyboard shortcut (⌘U)
 
 ## Project Structure
 
 ```
-SimplyHealth/
-├── SimplyHealth/
+PurusHealth/
+├── PurusHealth/
 │   ├── Models/              # SwiftData model definitions
 │   ├── Views/               # SwiftUI views
 │   │   ├── RecordEditor/    # Record editing views
@@ -86,8 +86,8 @@ SimplyHealth/
 │   ├── Services/            # Business logic and services
 │   ├── AppConfig.swift      # Centralized configuration
 │   └── Assets.xcassets      # Asset catalog
-├── SimplyHealthTests/       # Unit tests
-└── SimplyHealthUITests/     # UI tests
+├── PurusHealthTests/       # Unit tests
+└── PurusHealthUITests/     # UI tests
 ```
 
 ## CloudKit Integration

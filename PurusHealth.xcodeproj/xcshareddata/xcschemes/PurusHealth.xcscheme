@@ -8,9 +8,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A2786C502F0C6DB4007A8596"
-               BuildableName = "SimplyHealth.app"
-               BlueprintName = "SimplyHealth"
-               ReferencedContainer = "container:SimplyHealth.xcodeproj">
+               BuildableName = "PurusHealth.app"
+               BlueprintName = "PurusHealth"
+               ReferencedContainer = "container:PurusHealth.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -26,9 +26,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A2786C612F0C6DB5007A8596"
-               BuildableName = "SimplyHealthTests.xctest"
-               BlueprintName = "SimplyHealthTests"
-               ReferencedContainer = "container:SimplyHealth.xcodeproj">
+               BuildableName = "PurusHealthTests.xctest"
+               BlueprintName = "PurusHealthTests"
+               ReferencedContainer = "container:PurusHealth.xcodeproj">
             </BuildableReference>
          </TestableReference>
          <TestableReference
@@ -36,9 +36,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A2786C6B2F0C6DB5007A8596"
-               BuildableName = "SimplyHealthUITests.xctest"
-               BlueprintName = "SimplyHealthUITests"
-               ReferencedContainer = "container:SimplyHealth.xcodeproj">
+               BuildableName = "PurusHealthUITests.xctest"
+               BlueprintName = "PurusHealthUITests"
+               ReferencedContainer = "container:PurusHealth.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -46,9 +46,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A2786C502F0C6DB4007A8596"
-            BuildableName = "SimplyHealth.app"
-            BlueprintName = "SimplyHealth"
-            ReferencedContainer = "container:SimplyHealth.xcodeproj">
+            BuildableName = "PurusHealth.app"
+            BlueprintName = "PurusHealth"
+            ReferencedContainer = "container:PurusHealth.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
    </TestAction>
@@ -66,9 +66,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A2786C502F0C6DB4007A8596"
-            BuildableName = "SimplyHealth.app"
-            BlueprintName = "SimplyHealth"
-            ReferencedContainer = "container:SimplyHealth.xcodeproj">
+            BuildableName = "PurusHealth.app"
+            BlueprintName = "PurusHealth"
+            ReferencedContainer = "container:PurusHealth.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -79,9 +79,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A2786C502F0C6DB4007A8596"
-            BuildableName = "SimplyHealth.app"
-            BlueprintName = "SimplyHealth"
-            ReferencedContainer = "container:SimplyHealth.xcodeproj">
+            BuildableName = "PurusHealth.app"
+            BlueprintName = "PurusHealth"
+            ReferencedContainer = "container:PurusHealth.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>

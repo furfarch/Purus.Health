@@ -12,50 +12,50 @@
 			containerPortal = A2786C492F0C6DB4007A8596 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = A2786C502F0C6DB4007A8596;
-			remoteInfo = SimplyHealth;
+			remoteInfo = PurusHealth;
 		};
 		A2786C6D2F0C6DB5007A8596 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = A2786C492F0C6DB4007A8596 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = A2786C502F0C6DB4007A8596;
-			remoteInfo = SimplyHealth;
+			remoteInfo = PurusHealth;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		A2786C512F0C6DB4007A8596 /* SimplyHealth.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SimplyHealth.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		A2786C622F0C6DB5007A8596 /* SimplyHealthTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SimplyHealthTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		A2786C6C2F0C6DB5007A8596 /* SimplyHealthUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SimplyHealthUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A2786C512F0C6DB4007A8596 /* PurusHealth.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PurusHealth.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A2786C622F0C6DB5007A8596 /* PurusHealthTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PurusHealthTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A2786C6C2F0C6DB5007A8596 /* PurusHealthUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PurusHealthUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		A2786C742F0C6DB5007A8596 /* Exceptions for "SimplyHealth" folder in "SimplyHealth" target */ = {
+		A2786C742F0C6DB5007A8596 /* Exceptions for "PurusHealth" folder in "PurusHealth" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = A2786C502F0C6DB4007A8596 /* SimplyHealth */;
+			target = A2786C502F0C6DB4007A8596 /* PurusHealth */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		A2786C532F0C6DB4007A8596 /* SimplyHealth */ = {
+		A2786C532F0C6DB4007A8596 /* PurusHealth */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				A2786C742F0C6DB5007A8596 /* Exceptions for "SimplyHealth" folder in "SimplyHealth" target */,
+				A2786C742F0C6DB5007A8596 /* Exceptions for "PurusHealth" folder in "PurusHealth" target */,
 			);
-			path = SimplyHealth;
+			path = PurusHealth;
 			sourceTree = "<group>";
 		};
-		A2786C652F0C6DB5007A8596 /* SimplyHealthTests */ = {
+		A2786C652F0C6DB5007A8596 /* PurusHealthTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = SimplyHealthTests;
+			path = PurusHealthTests;
 			sourceTree = "<group>";
 		};
-		A2786C6F2F0C6DB5007A8596 /* SimplyHealthUITests */ = {
+		A2786C6F2F0C6DB5007A8596 /* PurusHealthUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = SimplyHealthUITests;
+			path = PurusHealthUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -88,9 +88,9 @@
 		A2786C482F0C6DB4007A8596 = {
 			isa = PBXGroup;
 			children = (
-				A2786C532F0C6DB4007A8596 /* SimplyHealth */,
-				A2786C652F0C6DB5007A8596 /* SimplyHealthTests */,
-				A2786C6F2F0C6DB5007A8596 /* SimplyHealthUITests */,
+				A2786C532F0C6DB4007A8596 /* PurusHealth */,
+				A2786C652F0C6DB5007A8596 /* PurusHealthTests */,
+				A2786C6F2F0C6DB5007A8596 /* PurusHealthUITests */,
 				A2786C522F0C6DB4007A8596 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -98,9 +98,9 @@
 		A2786C522F0C6DB4007A8596 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A2786C512F0C6DB4007A8596 /* SimplyHealth.app */,
-				A2786C622F0C6DB5007A8596 /* SimplyHealthTests.xctest */,
-				A2786C6C2F0C6DB5007A8596 /* SimplyHealthUITests.xctest */,
+				A2786C512F0C6DB4007A8596 /* PurusHealth.app */,
+				A2786C622F0C6DB5007A8596 /* PurusHealthTests.xctest */,
+				A2786C6C2F0C6DB5007A8596 /* PurusHealthUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -108,9 +108,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		A2786C502F0C6DB4007A8596 /* SimplyHealth */ = {
+		A2786C502F0C6DB4007A8596 /* PurusHealth */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A2786C752F0C6DB5007A8596 /* Build configuration list for PBXNativeTarget "SimplyHealth" */;
+			buildConfigurationList = A2786C752F0C6DB5007A8596 /* Build configuration list for PBXNativeTarget "PurusHealth" */;
 			buildPhases = (
 				A2786C4D2F0C6DB4007A8596 /* Sources */,
 				A2786C4E2F0C6DB4007A8596 /* Frameworks */,
@@ -121,18 +121,18 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				A2786C532F0C6DB4007A8596 /* SimplyHealth */,
+				A2786C532F0C6DB4007A8596 /* PurusHealth */,
 			);
-			name = SimplyHealth;
+			name = PurusHealth;
 			packageProductDependencies = (
 			);
-			productName = SimplyHealth;
-			productReference = A2786C512F0C6DB4007A8596 /* SimplyHealth.app */;
+			productName = PurusHealth;
+			productReference = A2786C512F0C6DB4007A8596 /* PurusHealth.app */;
 			productType = "com.apple.product-type.application";
 		};
-		A2786C612F0C6DB5007A8596 /* SimplyHealthTests */ = {
+		A2786C612F0C6DB5007A8596 /* PurusHealthTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A2786C7A2F0C6DB5007A8596 /* Build configuration list for PBXNativeTarget "SimplyHealthTests" */;
+			buildConfigurationList = A2786C7A2F0C6DB5007A8596 /* Build configuration list for PBXNativeTarget "PurusHealthTests" */;
 			buildPhases = (
 				A2786C5E2F0C6DB5007A8596 /* Sources */,
 				A2786C5F2F0C6DB5007A8596 /* Frameworks */,
@@ -144,18 +144,18 @@
 				A2786C642F0C6DB5007A8596 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				A2786C652F0C6DB5007A8596 /* SimplyHealthTests */,
+				A2786C652F0C6DB5007A8596 /* PurusHealthTests */,
 			);
-			name = SimplyHealthTests;
+			name = PurusHealthTests;
 			packageProductDependencies = (
 			);
-			productName = SimplyHealthTests;
-			productReference = A2786C622F0C6DB5007A8596 /* SimplyHealthTests.xctest */;
+			productName = PurusHealthTests;
+			productReference = A2786C622F0C6DB5007A8596 /* PurusHealthTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		A2786C6B2F0C6DB5007A8596 /* SimplyHealthUITests */ = {
+		A2786C6B2F0C6DB5007A8596 /* PurusHealthUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A2786C7D2F0C6DB5007A8596 /* Build configuration list for PBXNativeTarget "SimplyHealthUITests" */;
+			buildConfigurationList = A2786C7D2F0C6DB5007A8596 /* Build configuration list for PBXNativeTarget "PurusHealthUITests" */;
 			buildPhases = (
 				A2786C682F0C6DB5007A8596 /* Sources */,
 				A2786C692F0C6DB5007A8596 /* Frameworks */,
@@ -167,13 +167,13 @@
 				A2786C6E2F0C6DB5007A8596 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				A2786C6F2F0C6DB5007A8596 /* SimplyHealthUITests */,
+				A2786C6F2F0C6DB5007A8596 /* PurusHealthUITests */,
 			);
-			name = SimplyHealthUITests;
+			name = PurusHealthUITests;
 			packageProductDependencies = (
 			);
-			productName = SimplyHealthUITests;
-			productReference = A2786C6C2F0C6DB5007A8596 /* SimplyHealthUITests.xctest */;
+			productName = PurusHealthUITests;
+			productReference = A2786C6C2F0C6DB5007A8596 /* PurusHealthUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
@@ -199,7 +199,7 @@
 					};
 				};
 			};
-			buildConfigurationList = A2786C4C2F0C6DB4007A8596 /* Build configuration list for PBXProject "SimplyHealth" */;
+			buildConfigurationList = A2786C4C2F0C6DB4007A8596 /* Build configuration list for PBXProject "PurusHealth" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -213,9 +213,9 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				A2786C502F0C6DB4007A8596 /* SimplyHealth */,
-				A2786C612F0C6DB5007A8596 /* SimplyHealthTests */,
-				A2786C6B2F0C6DB5007A8596 /* SimplyHealthUITests */,
+				A2786C502F0C6DB4007A8596 /* PurusHealth */,
+				A2786C612F0C6DB5007A8596 /* PurusHealthTests */,
+				A2786C6B2F0C6DB5007A8596 /* PurusHealthUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -271,12 +271,12 @@
 /* Begin PBXTargetDependency section */
 		A2786C642F0C6DB5007A8596 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = A2786C502F0C6DB4007A8596 /* SimplyHealth */;
+			target = A2786C502F0C6DB4007A8596 /* PurusHealth */;
 			targetProxy = A2786C632F0C6DB5007A8596 /* PBXContainerItemProxy */;
 		};
 		A2786C6E2F0C6DB5007A8596 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = A2786C502F0C6DB4007A8596 /* SimplyHealth */;
+			target = A2786C502F0C6DB4007A8596 /* PurusHealth */;
 			targetProxy = A2786C6D2F0C6DB5007A8596 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -287,7 +287,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = SimplyHealth/SimplyHealth.entitlements;
+				CODE_SIGN_ENTITLEMENTS = PurusHealth/PurusHealth.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 42ZTRQWV4B;
@@ -296,7 +296,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = SimplyHealth/Info.plist;
+				INFOPLIST_FILE = PurusHealth/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Purus Health";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -333,7 +333,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = SimplyHealth/SimplyHealth.entitlements;
+				CODE_SIGN_ENTITLEMENTS = PurusHealth/PurusHealth.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 42ZTRQWV4B;
@@ -342,7 +342,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = SimplyHealth/Info.plist;
+				INFOPLIST_FILE = PurusHealth/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Purus Health";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -510,7 +510,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SimplyHealth.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SimplyHealth";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PurusHealth.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PurusHealth";
 			};
 			name = Debug;
 		};
@@ -534,7 +534,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/SimplyHealth.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/SimplyHealth";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/PurusHealth.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PurusHealth";
 			};
 			name = Release;
 		};
@@ -557,7 +557,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = SimplyHealth;
+				TEST_TARGET_NAME = PurusHealth;
 			};
 			name = Debug;
 		};
@@ -580,14 +580,14 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = SimplyHealth;
+				TEST_TARGET_NAME = PurusHealth;
 			};
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		A2786C4C2F0C6DB4007A8596 /* Build configuration list for PBXProject "SimplyHealth" */ = {
+		A2786C4C2F0C6DB4007A8596 /* Build configuration list for PBXProject "PurusHealth" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A2786C782F0C6DB5007A8596 /* Debug */,
@@ -596,7 +596,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A2786C752F0C6DB5007A8596 /* Build configuration list for PBXNativeTarget "SimplyHealth" */ = {
+		A2786C752F0C6DB5007A8596 /* Build configuration list for PBXNativeTarget "PurusHealth" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A2786C762F0C6DB5007A8596 /* Debug */,
@@ -605,7 +605,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A2786C7A2F0C6DB5007A8596 /* Build configuration list for PBXNativeTarget "SimplyHealthTests" */ = {
+		A2786C7A2F0C6DB5007A8596 /* Build configuration list for PBXNativeTarget "PurusHealthTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A2786C7B2F0C6DB5007A8596 /* Debug */,
@@ -614,7 +614,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A2786C7D2F0C6DB5007A8596 /* Build configuration list for PBXNativeTarget "SimplyHealthUITests" */ = {
+		A2786C7D2F0C6DB5007A8596 /* Build configuration list for PBXNativeTarget "PurusHealthUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A2786C7E2F0C6DB5007A8596 /* Debug */,

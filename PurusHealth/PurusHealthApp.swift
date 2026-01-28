@@ -1,6 +1,6 @@
 //
-//  SimplyHealthApp.swift
-//  Simply Health
+//  PurusHealthApp.swift
+//  Purus Health
 //
 //  Created by Chris Furfari on 05.01.2026.
 //
@@ -9,7 +9,7 @@ import SwiftUI
 import SwiftData
 
 @main
-struct SimplyHealthApp: App {
+struct PurusHealthApp: App {
     private let modelContainer: ModelContainer
     @Environment(\.scenePhase) private var scenePhase: ScenePhase
 

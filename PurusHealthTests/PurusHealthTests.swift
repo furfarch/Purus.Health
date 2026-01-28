@@ -8,7 +8,7 @@
 import Testing
 import Foundation
 import SwiftData
-@testable import SimplyHealth
+@testable import PurusHealth
 
 struct PurusHealthTests {
 

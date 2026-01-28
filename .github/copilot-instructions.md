@@ -62,7 +62,7 @@ Purus Health is a SwiftUI-based iOS/macOS application for managing personal medi
 ### Error Handling
 
 - Use Swift's `do-catch` blocks for error-prone operations
-- Provide fallback behavior when operations fail (see `SimplyHealthApp.init()` for example)
+- Provide fallback behavior when operations fail (see `PurusHealthApp.init()` for example)
 - Log errors with descriptive messages using print statements with component prefix (e.g., `[PurusHealthApp]`)
 
 ## Testing Guidelines
@@ -70,7 +70,7 @@ Purus Health is a SwiftUI-based iOS/macOS application for managing personal medi
 ### Test Framework
 
 - Use Swift Testing framework with `@Test` macro (not XCTest)
-- Import the module under test with `@testable import SimplyHealth`
+- Import the module under test with `@testable import PurusHealth`
 - Use `#expect()` assertions instead of XCTAssert
 - Mark async tests with `async throws`
 - Use `@MainActor` for tests that interact with SwiftData contexts
@@ -93,7 +93,7 @@ Purus Health is a SwiftUI-based iOS/macOS application for managing personal medi
 ## File Organization
 
 ```
-SimplyHealth/
+PurusHealth/
 ├── Models/           # SwiftData model definitions
 ├── Views/            # SwiftUI views
 │   └── RecordEditor/ # Sub-views for editing
@@ -112,7 +112,7 @@ SimplyHealth/
 
 ### Running Tests
 
-- Tests are located in `SimplyHealthTests/`
+- Tests are located in `PurusHealthTests/`
 - Use Swift Testing framework
 - Run tests through Xcode Test Navigator or using `xcodebuild test`
 
