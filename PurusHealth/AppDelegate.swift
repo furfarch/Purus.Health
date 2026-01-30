@@ -47,8 +47,8 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     private func handleUserActivity(_ userActivity: NSUserActivity) {
         ShareDebugStore.shared.appendLog("SceneDelegate: received userActivity type: \(userActivity.activityType)")
 
-        // Check for CloudKit share metadata first (most reliable for CloudKit shares)
-        if let metadata = userActivity.cloudKitShareMetadata {
+        // Check for CloudKit share metadata (available iOS 10+)
+        if let metadata = extractCloudKitMetadata(from: userActivity) {
             ShareDebugStore.shared.appendLog("SceneDelegate: found cloudKitShareMetadata, container: \(metadata.containerIdentifier)")
             PendingShareStore.shared.pendingMetadata = metadata
             DispatchQueue.main.async {
@@ -67,6 +67,12 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             handleShareURL(url)
         }
     }
+
+    private func extractCloudKitMetadata(from userActivity: NSUserActivity) -> CKShare.Metadata? {
+        // Use Key-Value coding to access cloudKitShareMetadata safely
+        // This avoids compilation issues with the property not being found
+        return userActivity.value(forKey: "cloudKitShareMetadata") as? CKShare.Metadata
+    }
 }
 
 @objc
@@ -82,7 +88,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
         ShareDebugStore.shared.appendLog("AppDelegate: received userActivity type: \(userActivity.activityType)")
 
-        if let metadata = userActivity.cloudKitShareMetadata {
+        // Use Key-Value coding to access cloudKitShareMetadata safely
+        if let metadata = userActivity.value(forKey: "cloudKitShareMetadata") as? CKShare.Metadata {
             ShareDebugStore.shared.appendLog("AppDelegate: found cloudKitShareMetadata")
             PendingShareStore.shared.pendingMetadata = metadata
             DispatchQueue.main.async {
