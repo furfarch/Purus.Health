@@ -10,6 +10,10 @@ import SwiftData
 
 @main
 struct PurusHealthApp: App {
+    #if canImport(UIKit)
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    #endif
+
     private let modelContainer: ModelContainer
     @Environment(\.scenePhase) private var scenePhase: ScenePhase
 
