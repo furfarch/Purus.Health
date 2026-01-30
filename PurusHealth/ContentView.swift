@@ -25,8 +25,38 @@ struct ContentView: View {
         RecordListView()
             .onOpenURL { url in
                 // Accept CloudKit share links and import shared records.
+                ShareDebugStore.shared.appendLog("ContentView: onOpenURL received: \(url)")
                 Task { @MainActor in
                     await CloudKitShareAcceptanceService.shared.acceptShare(from: url, modelContext: modelContext)
+                }
+            }
+            .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { userActivity in
+                // Handle CloudKit share links that come through as user activities
+                ShareDebugStore.shared.appendLog("ContentView: onContinueUserActivity received type: \(userActivity.activityType)")
+
+                // Try to get CloudKit metadata
+                if let metadata = userActivity.value(forKey: "cloudKitShareMetadata") as? CKShare.Metadata {
+                    ShareDebugStore.shared.appendLog("ContentView: found cloudKitShareMetadata in userActivity")
+                    Task { @MainActor in
+                        await CloudKitShareAcceptanceService.shared.acceptShare(from: metadata, modelContext: modelContext)
+                    }
+                } else if let url = userActivity.webpageURL {
+                    ShareDebugStore.shared.appendLog("ContentView: found webpageURL in userActivity: \(url)")
+                    Task { @MainActor in
+                        await CloudKitShareAcceptanceService.shared.acceptShare(from: url, modelContext: modelContext)
+                    }
+                }
+            }
+            .userActivity("com.apple.cloudkit.share.metadata") { userActivity in
+                // This is specifically for CloudKit share metadata
+                ShareDebugStore.shared.appendLog("ContentView: CloudKit share userActivity callback")
+            }
+            .onContinueUserActivity("com.apple.cloudkit.share.metadata") { userActivity in
+                ShareDebugStore.shared.appendLog("ContentView: onContinueUserActivity CloudKit share metadata")
+                if let metadata = userActivity.value(forKey: "cloudKitShareMetadata") as? CKShare.Metadata {
+                    Task { @MainActor in
+                        await CloudKitShareAcceptanceService.shared.acceptShare(from: metadata, modelContext: modelContext)
+                    }
                 }
             }
             .task {
