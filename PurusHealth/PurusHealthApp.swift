@@ -77,6 +77,12 @@ struct PurusHealthApp: App {
                     if await hasSharedRecordsLocally() {
                         await fetchSharedRecordsOnLaunch()
                     }
+
+                    // If a share was accepted recently, force a shared fetch once on launch
+                    if UserDefaults.standard.bool(forKey: "pendingSharedImport") {
+                        await fetchSharedRecordsOnLaunch()
+                        UserDefaults.standard.set(false, forKey: "pendingSharedImport")
+                    }
                 }
                 .onChange(of: scenePhase) { oldPhase, newPhase in
                     // Sync when app becomes active to get latest changes
@@ -91,6 +97,12 @@ struct PurusHealthApp: App {
                             // Only fetch shared records if there are existing shared records locally
                             if await hasSharedRecordsLocally() {
                                 await fetchSharedRecordsOnLaunch()
+                            }
+
+                            // If a share was accepted while app was backgrounded, fetch now
+                            if UserDefaults.standard.bool(forKey: "pendingSharedImport") {
+                                await fetchSharedRecordsOnLaunch()
+                                UserDefaults.standard.set(false, forKey: "pendingSharedImport")
                             }
                         }
                     }

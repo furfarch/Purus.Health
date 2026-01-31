@@ -48,6 +48,8 @@ final class CloudKitShareAcceptanceService {
                 object: nil,
                 userInfo: ["names": importedNames]
             )
+
+            UserDefaults.standard.set(true, forKey: "pendingSharedImport")
         } catch {
             ShareDebugStore.shared.appendLog("CloudKitShareAcceptanceService: accept failed error=\(error)")
             ShareDebugStore.shared.lastError = error
@@ -98,6 +100,8 @@ final class CloudKitShareAcceptanceService {
                 object: nil,
                 userInfo: ["names": importedNames]
             )
+
+            UserDefaults.standard.set(true, forKey: "pendingSharedImport")
         } catch {
             ShareDebugStore.shared.appendLog("CloudKitShareAcceptanceService: accept failed error=\(error)")
             ShareDebugStore.shared.lastError = error

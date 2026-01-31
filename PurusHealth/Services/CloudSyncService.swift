@@ -130,6 +130,26 @@ final class CloudSyncService {
         }
 
         try await ensureShareZoneExists()
+
+        // If this record is part of a CloudKit share, attempt to write back to the shared database
+        // so receivers with write permission can sync their edits back to the owner and other participants.
+        if record.isSharingEnabled, let _ = record.cloudShareRecordName {
+            do {
+                try await syncSharedRecordIfNeeded(record)
+                return
+            } catch {
+                // If the user has read-only permission, CloudKit will return a permission failure.
+                // In that case, surface a friendly error and fall through to private DB sync only if this device is the owner.
+                if let ck = error as? CKError, ck.code == .permissionFailure {
+                    ShareDebugStore.shared.appendLog("syncIfNeeded: shared write denied (read-only participant) for record=\(record.uuid)")
+                    throw NSError(domain: "CloudSyncService", code: 8, userInfo: [NSLocalizedDescriptionKey: "You don't have permission to edit this shared record."])
+                } else {
+                    ShareDebugStore.shared.appendLog("syncIfNeeded: shared write failed for record=\(record.uuid) error=\(error)")
+                    throw error
+                }
+            }
+        }
+
         try await migrateRootRecordToShareZoneIfNeeded(record: record)
 
         let ckID = zonedRecordID(for: record)
@@ -151,6 +171,58 @@ final class CloudSyncService {
             ShareDebugStore.shared.appendLog("syncIfNeeded: saved id=\(saved.recordID.recordName) zone=\(shareZoneName) type=\(saved.recordType) for local uuid=\(record.uuid)")
         } catch {
             ShareDebugStore.shared.appendLog("syncIfNeeded: failed to save record=\(record.uuid) error=\(error)")
+            throw enrichCloudKitError(error)
+        }
+    }
+
+    // MARK: - Shared write-back (for receivers with write permission)
+    private func syncSharedRecordIfNeeded(_ record: MedicalRecord) async throws {
+        let sharedDB = container.sharedCloudDatabase
+
+        // Find the shared CKRecord by uuid across all shared zones
+        let zones: [CKRecordZone] = try await withCheckedThrowingContinuation { (cont: CheckedContinuation<[CKRecordZone], Error>) in
+            sharedDB.fetchAllRecordZones { zones, error in
+                if let error { cont.resume(throwing: error); return }
+                cont.resume(returning: zones ?? [])
+            }
+        }
+
+        var foundRecord: CKRecord? = nil
+        zoneLoop: for zone in zones {
+            let predicate = NSPredicate(format: "uuid == %@", record.uuid)
+            let query = CKQuery(recordType: medicalRecordType, predicate: predicate)
+            let op = CKQueryOperation(query: query)
+            op.zoneID = zone.zoneID
+
+            foundRecord = try await withCheckedThrowingContinuation { (cont: CheckedContinuation<CKRecord?, Error>) in
+                var captured: CKRecord?
+                op.recordMatchedBlock = { (_, result) in
+                    if case .success(let rec) = result { captured = rec }
+                }
+                op.queryResultBlock = { result in
+                    switch result {
+                    case .success:
+                        cont.resume(returning: captured)
+                    case .failure(let err):
+                        cont.resume(throwing: err)
+                    }
+                }
+                sharedDB.add(op)
+            }
+
+            if foundRecord != nil { break zoneLoop }
+        }
+
+        guard let sharedCKRecord = foundRecord else {
+            throw NSError(domain: "CloudSyncService", code: 9, userInfo: [NSLocalizedDescriptionKey: "Shared record not found in shared database."])
+        }
+
+        // Apply local changes and save to the shared database
+        applyMedicalRecord(record, to: sharedCKRecord)
+        do {
+            let saved = try await sharedDB.save(sharedCKRecord)
+            ShareDebugStore.shared.appendLog("syncSharedRecordIfNeeded: saved shared record id=\(saved.recordID.recordName) zone=\(saved.recordID.zoneID.zoneName) for local uuid=\(record.uuid)")
+        } catch {
             throw enrichCloudKitError(error)
         }
     }
@@ -640,3 +712,4 @@ class CloudSharingDelegate: NSObject, UICloudSharingControllerDelegate {
     func itemType(for c: UICloudSharingController) -> String? { "public.data" }
 }
 #endif
+

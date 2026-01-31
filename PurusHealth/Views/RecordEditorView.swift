@@ -12,6 +12,16 @@ struct RecordEditorView: View {
     @State private var saveErrorMessage: String?
     @State private var showCloudSettings: Bool = false
 
+    // MARK: - Permissions
+    private var isSharedReadOnly: Bool {
+        if let shareName = record.cloudShareRecordName, !shareName.isEmpty {
+            // Recipients are read-only by default; owner can edit.
+            // For precise permissions, extend to fetch CKShare and inspect local participant permission.
+            return true
+        }
+        return false
+    }
+
     init(record: MedicalRecord, startEditing: Bool = false) {
         self._record = .init(wrappedValue: record)
         self._isEditing = State(initialValue: startEditing)
@@ -44,6 +54,7 @@ struct RecordEditorView: View {
                         isEditing = true
                     }
                 }
+                .disabled(isSharedReadOnly)
             }
 
             #if os(iOS) || targetEnvironment(macCatalyst)
@@ -52,6 +63,7 @@ struct RecordEditorView: View {
                     Button("Cloud & Sharing") {
                         showCloudSettings = true
                     }
+                    .disabled(isSharedReadOnly)
                 }
             }
             #else
@@ -60,6 +72,7 @@ struct RecordEditorView: View {
                     Button("Cloud & Sharing") {
                         showCloudSettings = true
                     }
+                    .disabled(isSharedReadOnly)
                 }
             }
             #endif
