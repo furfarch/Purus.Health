@@ -12,7 +12,8 @@ class CloudKitMedicalRecordFetcher: ObservableObject {
 
     private let container: CKContainer
     private let database: CKDatabase
-    private let recordType = AppConfig.CloudKit.recordType
+    // Must match CloudSyncService.medicalRecordType
+    private let recordType = "MedicalRecord"
     private var modelContext: ModelContext?
 
     // Keep in sync with CloudSyncService.shareZoneName
