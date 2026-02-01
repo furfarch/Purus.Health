@@ -83,6 +83,10 @@ struct PurusHealthApp: App {
                         await fetchSharedRecordsOnLaunch()
                         UserDefaults.standard.set(false, forKey: "pendingSharedImport")
                     }
+                    
+                    // Ensure CloudKit push subscriptions exist
+                    await cloudFetcher.ensurePrivateDBSubscription()
+                    await ensureSharedDBSubscription()
                 }
                 .onChange(of: scenePhase) { oldPhase, newPhase in
                     // Sync when app becomes active to get latest changes
@@ -104,6 +108,10 @@ struct PurusHealthApp: App {
                                 await fetchSharedRecordsOnLaunch()
                                 UserDefaults.standard.set(false, forKey: "pendingSharedImport")
                             }
+
+                            // Ensure CloudKit push subscriptions exist
+                            await cloudFetcher.ensurePrivateDBSubscription()
+                            await ensureSharedDBSubscription()
                         }
                     }
                 }
@@ -163,5 +171,10 @@ struct PurusHealthApp: App {
             // Best-effort: log but don't fail the app
             ShareDebugStore.shared.appendLog("PurusHealthApp: failed to fetch shared records on launch: \(error)")
         }
+    }
+    
+    @MainActor
+    private func ensureSharedDBSubscription() async {
+        await ensureSharedDBSubscription(containerIdentifier: AppConfig.CloudKit.containerID)
     }
 }

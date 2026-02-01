@@ -144,6 +144,8 @@ struct RecordListView: View {
                     do {
                         try await CloudSyncService.shared.deleteSyncRecord(forLocalRecord: record)
                         SharedImportSuppression.suppress(record.uuid)
+                        // Notify other components to refresh shared state
+                        NotificationCenter.default.post(name: NotificationNames.didChangeSharedRecords, object: nil)
                         record.isMarkedForDeletion = true
                         record.updatedAt = Date()
                         try? modelContext.save()

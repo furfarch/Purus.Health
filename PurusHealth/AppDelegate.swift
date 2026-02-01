@@ -97,6 +97,14 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         alert.addAction(UIAlertAction(title: "OK", style: .default))
         window.rootViewController?.present(alert, animated: true)
     }
+    
+    func scene(_ scene: UIScene, userDidAcceptCloudKitShareWith metadata: CKShare.Metadata) {
+        ShareDebugStore.shared.appendLog("SceneDelegate: userDidAcceptCloudKitShareWith (SceneDelegate) called")
+        PendingShareStore.shared.pendingMetadata = metadata
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: NotificationNames.pendingShareReceived, object: nil, userInfo: ["metadata": metadata])
+        }
+    }
 }
 
 @objc
@@ -141,5 +149,21 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
         return false
     }
+    
+    func application(_ application: UIApplication, userDidAcceptCloudKitShareWith metadata: CKShare.Metadata) {
+        ShareDebugStore.shared.appendLog("AppDelegate: userDidAcceptCloudKitShareWith (AppDelegate) called")
+        PendingShareStore.shared.pendingMetadata = metadata
+        DispatchQueue.main.async {
+            NotificationCenter.default.post(name: NotificationNames.pendingShareReceived, object: nil, userInfo: ["metadata": metadata])
+        }
+    }
+    
+    func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable : Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
+        ShareDebugStore.shared.appendLog("AppDelegate: didReceiveRemoteNotification")
+        // Post a notification so views can refresh shared/private records
+        NotificationCenter.default.post(name: NotificationNames.didChangeSharedRecords, object: nil)
+        completionHandler(.newData)
+    }
 }
 #endif
+

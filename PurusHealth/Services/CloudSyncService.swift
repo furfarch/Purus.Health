@@ -293,6 +293,27 @@ final class CloudSyncService {
         }
     }
 
+    /// Stops sharing for a record by deleting the CKShare only, keeping the root record intact.
+    func stopSharing(for record: MedicalRecord) async throws {
+        try await ensureShareZoneExists()
+        guard let shareRecordName = record.cloudShareRecordName else { return }
+        let shareID = CKRecord.ID(recordName: shareRecordName, zoneID: shareZoneID)
+        do {
+            _ = try await database.deleteRecord(withID: shareID)
+            ShareDebugStore.shared.appendLog("stopSharing: deleted CKShare id=\(shareRecordName) zone=\(shareZoneName) for record=\(record.uuid)")
+        } catch {
+            if let ck = error as? CKError, ck.code == .unknownItem {
+                ShareDebugStore.shared.appendLog("stopSharing: share already missing id=\(shareRecordName)")
+            } else {
+                throw error
+            }
+        }
+        record.cloudShareRecordName = nil
+        record.isSharingEnabled = false
+        record.shareParticipantsSummary = ""
+        record.updatedAt = Date()
+    }
+
     // MARK: - Sharing
 
     func createShare(for record: MedicalRecord) async throws -> CKShare {

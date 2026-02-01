@@ -145,9 +145,18 @@ struct CloudRecordSettingsView: View {
                             try? modelContext.save()
                         }
                     } else {
-                        // MVP: local-only toggle. Unsharing CloudKit records can be added later.
+                        // Turning sharing OFF: if a share exists, stop sharing in CloudKit (owner flow)
                         record.isSharingEnabled = false
-                        record.shareParticipantsSummary = ""
+                        Task { @MainActor in
+                            do {
+                                try await CloudSyncService.shared.stopSharing(for: record)
+                                try? modelContext.save()
+                                // Notify UI to refresh shared state
+                                NotificationCenter.default.post(name: NotificationNames.didChangeSharedRecords, object: nil)
+                            } catch {
+                                errorMessage = "Failed to stop sharing: \(error.localizedDescription)"
+                            }
+                        }
                     }
 
                     record.updatedAt = Date()
@@ -160,6 +169,31 @@ struct CloudRecordSettingsView: View {
                 Text(record.shareParticipantsSummary.isEmpty ? "Shared with: (not loaded yet)" : "Shared with: \(record.shareParticipantsSummary)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                
+                if record.cloudShareRecordName != nil {
+                    HStack(spacing: 12) {
+                        Button("Manage Sharing") {
+                            // Reuse the share sheet to manage participants/permissions
+                            sharingRecord = record
+                        }
+                        .buttonStyle(.bordered)
+
+                        Button(role: .destructive) {
+                            Task { @MainActor in
+                                do {
+                                    try await CloudSyncService.shared.stopSharing(for: record)
+                                    try? modelContext.save()
+                                    NotificationCenter.default.post(name: NotificationNames.didChangeSharedRecords, object: nil)
+                                } catch {
+                                    errorMessage = "Failed to stop sharing: \(error.localizedDescription)"
+                                }
+                            }
+                        } label: {
+                            Text("Stop Sharing")
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
             }
 
             if !cloudEnabled {

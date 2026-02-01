@@ -24,6 +24,8 @@ class CloudKitMedicalRecordFetcher: ObservableObject {
 
     // Persist the server change token so we can fetch incremental changes.
     private let changeTokenDefaultsKey = "CloudKitMedicalRecordFetcher.shareZoneChangeToken"
+    
+    private let privateDBSubscriptionID = "MedicalRecordPrivateZoneChanges"
 
     init(containerIdentifier: String? = nil, modelContext: ModelContext? = nil) {
         let resolvedIdentifier = containerIdentifier ?? AppConfig.CloudKit.containerID
@@ -34,6 +36,19 @@ class CloudKitMedicalRecordFetcher: ObservableObject {
 
     func setModelContext(_ context: ModelContext) {
         self.modelContext = context
+    }
+    
+    func ensurePrivateDBSubscription() async {
+        do {
+            let sub = CKDatabaseSubscription(subscriptionID: privateDBSubscriptionID)
+            let info = CKSubscription.NotificationInfo()
+            info.shouldSendContentAvailable = true
+            sub.notificationInfo = info
+            try await database.save(sub)
+            ShareDebugStore.shared.appendLog("CloudKitMedicalRecordFetcher: ensured private DB subscription")
+        } catch {
+            ShareDebugStore.shared.appendLog("CloudKitMedicalRecordFetcher: failed to ensure private DB subscription: \(error)")
+        }
     }
 
     // MARK: - Incremental sync (preferred)
@@ -304,6 +319,12 @@ class CloudKitMedicalRecordFetcher: ObservableObject {
             record.emergencyNumber = ckRecord["emergencyNumber"] as? String ?? ""
             record.emergencyEmail = ckRecord["emergencyEmail"] as? String ?? ""
 
+            // Map private DB share reference to local sharing flags for owner’s other devices
+            if let shareRef = ckRecord.share {
+                record.isSharingEnabled = true
+                record.cloudShareRecordName = shareRef.recordID.recordName
+            }
+
             // Read isSharingEnabled mirrored as Int64 (0/1) from CloudKit if present
             if let num = ckRecord["isSharingEnabled"] as? NSNumber {
                 record.isSharingEnabled = (num.int64Value != 0)
@@ -358,3 +379,19 @@ class CloudKitMedicalRecordFetcher: ObservableObject {
     }
 }
 
+@MainActor
+func ensureSharedDBSubscription(containerIdentifier: String) async {
+    let container = CKContainer(identifier: containerIdentifier)
+    let sharedDB = container.sharedCloudDatabase
+    let subID = "MedicalRecordSharedDBChanges"
+    do {
+        let sub = CKDatabaseSubscription(subscriptionID: subID)
+        let info = CKSubscription.NotificationInfo()
+        info.shouldSendContentAvailable = true
+        sub.notificationInfo = info
+        try await sharedDB.save(sub)
+        ShareDebugStore.shared.appendLog("CloudKitMedicalRecordFetcher: ensured shared DB subscription")
+    } catch {
+        ShareDebugStore.shared.appendLog("CloudKitMedicalRecordFetcher: failed to ensure shared DB subscription: \(error)")
+    }
+}
