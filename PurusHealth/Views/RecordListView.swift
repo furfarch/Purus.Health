@@ -143,6 +143,7 @@ struct RecordListView: View {
                 if record.isCloudEnabled || record.isSharingEnabled || record.cloudShareRecordName != nil {
                     do {
                         try await CloudSyncService.shared.deleteSyncRecord(forLocalRecord: record)
+                        SharedImportSuppression.suppress(record.uuid)
                     } catch {
                         // Surface error but continue with local deletion to keep UI responsive
                         saveErrorMessage = "Cloud delete failed: \(error.localizedDescription)"
@@ -231,3 +232,4 @@ struct RecordListView: View {
     RecordListView()
         .modelContainer(for: MedicalRecord.self, inMemory: true)
 }
+

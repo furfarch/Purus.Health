@@ -95,6 +95,12 @@ final class CloudKitSharedZoneMedicalRecordFetcher {
         }
 
         for ckRecord in records {
+            // Skip re-importing records that were locally deleted by user (suppression list)
+            if let uuid = ckRecord["uuid"] as? String, SharedImportSuppression.isSuppressed(uuid) {
+                ShareDebugStore.shared.appendLog("SharedZoneFetcher: suppressed re-import for uuid=\(uuid)")
+                continue
+            }
+
             guard let uuid = ckRecord["uuid"] as? String else { continue }
 
             let cloudUpdatedAt = (ckRecord["updatedAt"] as? Date) ?? Date.distantPast

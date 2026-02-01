@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		A28CCB112F2F68E3006F36DD /* SharedImportSuppression.swift in Sources */ = {isa = PBXBuildFile; fileRef = A28CCB102F2F68E3006F36DD /* SharedImportSuppression.swift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		A2786C632F0C6DB5007A8596 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -27,6 +31,7 @@
 		A2786C512F0C6DB4007A8596 /* PurusHealth.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PurusHealth.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A2786C622F0C6DB5007A8596 /* PurusHealthTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PurusHealthTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A2786C6C2F0C6DB5007A8596 /* PurusHealthUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = PurusHealthUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A28CCB102F2F68E3006F36DD /* SharedImportSuppression.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedImportSuppression.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -92,6 +97,7 @@
 				A2786C652F0C6DB5007A8596 /* PurusHealthTests */,
 				A2786C6F2F0C6DB5007A8596 /* PurusHealthUITests */,
 				A2786C522F0C6DB4007A8596 /* Products */,
+				A28CCB102F2F68E3006F36DD /* SharedImportSuppression.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -249,6 +255,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A28CCB112F2F68E3006F36DD /* SharedImportSuppression.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

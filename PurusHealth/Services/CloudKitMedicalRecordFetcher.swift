@@ -147,11 +147,18 @@ class CloudKitMedicalRecordFetcher: ObservableObject {
 
             if let existing = (try? context.fetch(fetchDescriptor))?.first {
                 context.delete(existing)
+                // Clear suppression on confirmed cloud deletion
+                SharedImportSuppression.clear(existing.uuid)
             }
         }
 
         do {
             try context.save()
+            // Nudge UI to refresh immediately after deletions
+            context.processPendingChanges()
+            Task { @MainActor in
+                NotificationCenter.default.post(name: NotificationNames.didImportRecords, object: nil)
+            }
         } catch {
             ShareDebugStore.shared.appendLog("CloudKitMedicalRecordFetcher: failed saving deletions: \(error)")
         }
@@ -309,6 +316,11 @@ class CloudKitMedicalRecordFetcher: ObservableObject {
 
         do {
             try context.save()
+            // Nudge UI to refresh immediately after imports
+            context.processPendingChanges()
+            Task { @MainActor in
+                NotificationCenter.default.post(name: NotificationNames.didImportRecords, object: nil)
+            }
         } catch {
             ShareDebugStore.shared.appendLog("CloudKitMedicalRecordFetcher: failed saving import: \(error)")
         }
