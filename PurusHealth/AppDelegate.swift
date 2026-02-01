@@ -98,7 +98,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         window.rootViewController?.present(alert, animated: true)
     }
     
-    func scene(_ scene: UIScene, userDidAcceptCloudKitShareWith metadata: CKShare.Metadata) {
+    func windowScene(_ windowScene: UIWindowScene, userDidAcceptCloudKitShareWith metadata: CKShare.Metadata) {
         ShareDebugStore.shared.appendLog("SceneDelegate: userDidAcceptCloudKitShareWith (SceneDelegate) called")
         PendingShareStore.shared.pendingMetadata = metadata
         DispatchQueue.main.async {

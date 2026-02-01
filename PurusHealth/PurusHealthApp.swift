@@ -175,6 +175,6 @@ struct PurusHealthApp: App {
     
     @MainActor
     private func ensureSharedDBSubscription() async {
-        await ensureSharedDBSubscription(containerIdentifier: AppConfig.CloudKit.containerID)
+        await PurusHealth.ensureSharedDBSubscription(containerIdentifier: AppConfig.CloudKit.containerID)
     }
 }
