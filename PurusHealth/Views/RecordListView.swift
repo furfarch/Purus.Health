@@ -136,17 +136,20 @@ struct RecordListView: View {
 
     private func deleteRecords(at offsets: IndexSet) {
         Task { @MainActor in
-            // delete in reverse index order
             for index in offsets.sorted(by: >) {
                 let record = records[index]
-                if record.isCloudEnabled {
+
+                // If this record participates in CloudKit (owner or shared), delete from CloudKit first.
+                if record.isCloudEnabled || record.isSharingEnabled || record.cloudShareRecordName != nil {
                     do {
-                        try await CloudSyncService.shared.deleteCloudRecord(for: record)
+                        try await CloudSyncService.shared.deleteSyncRecord(forLocalRecord: record)
                     } catch {
-                        // record cloud delete failed; surface error but continue with local deletion
+                        // Surface error but continue with local deletion to keep UI responsive
                         saveErrorMessage = "Cloud delete failed: \(error.localizedDescription)"
                     }
                 }
+
+                // Local deletion
                 modelContext.delete(record)
             }
             do { try modelContext.save() }

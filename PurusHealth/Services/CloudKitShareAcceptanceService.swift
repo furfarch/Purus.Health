@@ -40,6 +40,14 @@ final class CloudKitShareAcceptanceService {
                 modelContext: modelContext
             )
 
+            // Force a full shared import across zones to ensure visibility immediately after acceptance
+            do {
+                let sharedFetcher = CloudKitSharedZoneMedicalRecordFetcher(containerIdentifier: AppConfig.CloudKit.containerID, modelContext: modelContext)
+                _ = try await sharedFetcher.fetchAllSharedAcrossZonesAsync()
+            } catch {
+                ShareDebugStore.shared.appendLog("CloudKitShareAcceptanceService: post-accept full shared import failed: \(error)")
+            }
+
             ShareDebugStore.shared.appendLog("CloudKitShareAcceptanceService: import complete (count=\(recordsByID.count))")
 
             // Post notification so ContentView can refresh and show the imported records
@@ -91,6 +99,14 @@ final class CloudKitShareAcceptanceService {
                 share: fetchedShare,
                 modelContext: modelContext
             )
+
+            // Force a full shared import across zones to ensure visibility immediately after acceptance
+            do {
+                let sharedFetcher = CloudKitSharedZoneMedicalRecordFetcher(containerIdentifier: AppConfig.CloudKit.containerID, modelContext: modelContext)
+                _ = try await sharedFetcher.fetchAllSharedAcrossZonesAsync()
+            } catch {
+                ShareDebugStore.shared.appendLog("CloudKitShareAcceptanceService: post-accept full shared import failed: \(error)")
+            }
 
             ShareDebugStore.shared.appendLog("CloudKitShareAcceptanceService: import complete (count=\(recordsByID.count))")
 
@@ -300,3 +316,4 @@ private enum CloudKitSharedImporter {
         return parts.isEmpty ? "Only you" : parts.joined(separator: ", ")
     }
 }
+
