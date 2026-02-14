@@ -171,6 +171,86 @@ struct PurusHealthTests {
         #expect(record.displayName == "Pet")
     }
 
+    @Test func testPetFields() async throws {
+        let record = MedicalRecord()
+        record.isPet = true
+        
+        // Test initial values
+        #expect(record.personalName == "")
+        #expect(record.petDateOfBirth == nil)
+        #expect(record.petBreed == "")
+        #expect(record.petColor == "")
+        #expect(record.petSex == "")
+        
+        // Set pet-specific fields
+        record.personalName = "Max"
+        let birthdate = Date(timeIntervalSince1970: 1577836800) // Jan 1, 2020
+        record.petDateOfBirth = birthdate
+        record.petBreed = "Golden Retriever"
+        record.petColor = "Golden"
+        record.petSex = "Male"
+        
+        // Verify fields are set correctly
+        #expect(record.personalName == "Max")
+        #expect(record.petDateOfBirth == birthdate)
+        #expect(record.petBreed == "Golden Retriever")
+        #expect(record.petColor == "Golden")
+        #expect(record.petSex == "Male")
+    }
+
+    @Test @MainActor func testPetFieldsPersistence() async throws {
+        let schema = Schema([MedicalRecord.self])
+        let config = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: false,
+            cloudKitDatabase: .none
+        )
+
+        let testUUID = "TEST-PET-FIELDS-12345678-ABCD"
+        let birthdate = Date(timeIntervalSince1970: 1609459200) // Jan 1, 2021
+        
+        do {
+            let container1 = try ModelContainer(for: schema, configurations: [config])
+            let context1 = container1.mainContext
+
+            let record = MedicalRecord()
+            record.uuid = testUUID
+            record.isPet = true
+            record.personalName = "Bella"
+            record.petDateOfBirth = birthdate
+            record.petBreed = "Labrador"
+            record.petColor = "Black"
+            record.petSex = "Female"
+
+            context1.insert(record)
+            try context1.save()
+        }
+
+        do {
+            let container2 = try ModelContainer(for: schema, configurations: [config])
+            let context2 = container2.mainContext
+
+            // Fetch all records and filter for our test record
+            let all = try context2.fetch(FetchDescriptor<MedicalRecord>())
+            let records = all.filter { $0.uuid == testUUID }
+
+            #expect(records.count == 1, "Pet record should persist across container instances")
+            
+            if let record = records.first {
+                #expect(record.isPet == true)
+                #expect(record.personalName == "Bella")
+                #expect(record.petDateOfBirth == birthdate)
+                #expect(record.petBreed == "Labrador")
+                #expect(record.petColor == "Black")
+                #expect(record.petSex == "Female")
+                
+                // Cleanup
+                context2.delete(record)
+                try context2.save()
+            }
+        }
+    }
+
     @Test func testSortKeyOrdering() async throws {
         let record1 = MedicalRecord()
         record1.personalFamilyName = "Apple"

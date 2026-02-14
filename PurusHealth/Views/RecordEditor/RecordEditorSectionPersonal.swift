@@ -11,6 +11,19 @@ struct RecordEditorSectionPersonal: View {
                 // Use dedicated pet fields in the model
                 TextField("Name", text: $record.personalName)
                 TextField("Animal ID (ANIS)", text: $record.personalAnimalID)
+                
+                DatePicker(
+                    "Date of Birth",
+                    selection: Binding(
+                        get: { record.petDateOfBirth ?? Date() },
+                        set: { record.petDateOfBirth = $0 }
+                    ),
+                    displayedComponents: .date
+                )
+                
+                TextField("Breed", text: $record.petBreed)
+                TextField("Color", text: $record.petColor)
+                TextField("Sex", text: $record.petSex)
                 TextField("Owner Name", text: $record.ownerName)
                 TextField("Owner Phone", text: $record.ownerPhone)
                 TextField("Owner Email", text: $record.ownerEmail)
@@ -19,6 +32,10 @@ struct RecordEditorSectionPersonal: View {
             }
             .onChange(of: record.personalName) { onChange() }
             .onChange(of: record.personalAnimalID) { onChange() }
+            .onChange(of: record.petDateOfBirth) { onChange() }
+            .onChange(of: record.petBreed) { onChange() }
+            .onChange(of: record.petColor) { onChange() }
+            .onChange(of: record.petSex) { onChange() }
             .onChange(of: record.ownerName) { onChange() }
             .onChange(of: record.ownerPhone) { onChange() }
             .onChange(of: record.ownerEmail) { onChange() }
