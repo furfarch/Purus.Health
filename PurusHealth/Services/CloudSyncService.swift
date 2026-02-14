@@ -676,7 +676,7 @@ final class CloudSyncService {
     }
 
     // MARK: - Mapping
-
+    
     private func applyMedicalRecord(_ record: MedicalRecord, to ckRecord: CKRecord) {
         ckRecord["uuid"] = record.uuid as NSString
         ckRecord["createdAt"] = record.createdAt as NSDate
@@ -706,9 +706,90 @@ final class CloudSyncService {
         ckRecord["ownerPhone"] = record.ownerPhone as NSString
         ckRecord["ownerEmail"] = record.ownerEmail as NSString
 
+        // Veterinary fields
+        ckRecord["vetClinicName"] = record.vetClinicName as NSString
+        ckRecord["vetContactName"] = record.vetContactName as NSString
+        ckRecord["vetPhone"] = record.vetPhone as NSString
+        ckRecord["vetEmail"] = record.vetEmail as NSString
+        ckRecord["vetAddress"] = record.vetAddress as NSString
+        ckRecord["vetNote"] = record.vetNote as NSString
+
         ckRecord["emergencyName"] = record.emergencyName as NSString
         ckRecord["emergencyNumber"] = record.emergencyNumber as NSString
         ckRecord["emergencyEmail"] = record.emergencyEmail as NSString
+
+        // Serialize relationship arrays as JSON
+        // Blood entries
+        let codableBlood = record.blood.map { CodableBloodEntry(date: $0.date?.timeIntervalSince1970, name: $0.name, comment: $0.comment) }
+        if let bloodJSON = try? JSONEncoder().encode(codableBlood), let bloodString = String(data: bloodJSON, encoding: .utf8) {
+            ckRecord["bloodEntries"] = bloodString as NSString
+        }
+
+        // Drug entries
+        let codableDrugs = record.drugs.map { CodableDrugEntry(date: $0.date?.timeIntervalSince1970, nameAndDosage: $0.nameAndDosage, comment: $0.comment) }
+        if let drugsJSON = try? JSONEncoder().encode(codableDrugs), let drugsString = String(data: drugsJSON, encoding: .utf8) {
+            ckRecord["drugEntries"] = drugsString as NSString
+        }
+
+        // Vaccination entries
+        let codableVaccinations = record.vaccinations.map { CodableVaccinationEntry(date: $0.date?.timeIntervalSince1970, name: $0.name, information: $0.information, place: $0.place, comment: $0.comment) }
+        if let vaccinationsJSON = try? JSONEncoder().encode(codableVaccinations), let vaccinationsString = String(data: vaccinationsJSON, encoding: .utf8) {
+            ckRecord["vaccinationEntries"] = vaccinationsString as NSString
+        }
+
+        // Allergy entries
+        let codableAllergy = record.allergy.map { CodableAllergyEntry(date: $0.date?.timeIntervalSince1970, name: $0.name, information: $0.information, comment: $0.comment) }
+        if let allergyJSON = try? JSONEncoder().encode(codableAllergy), let allergyString = String(data: allergyJSON, encoding: .utf8) {
+            ckRecord["allergyEntries"] = allergyString as NSString
+        }
+
+        // Illness entries
+        let codableIllness = record.illness.map { CodableIllnessEntry(date: $0.date?.timeIntervalSince1970, name: $0.name, informationOrComment: $0.informationOrComment) }
+        if let illnessJSON = try? JSONEncoder().encode(codableIllness), let illnessString = String(data: illnessJSON, encoding: .utf8) {
+            ckRecord["illnessEntries"] = illnessString as NSString
+        }
+
+        // Risk entries
+        let codableRisks = record.risks.map { CodableRiskEntry(date: $0.date?.timeIntervalSince1970, name: $0.name, descriptionOrComment: $0.descriptionOrComment) }
+        if let risksJSON = try? JSONEncoder().encode(codableRisks), let risksString = String(data: risksJSON, encoding: .utf8) {
+            ckRecord["riskEntries"] = risksString as NSString
+        }
+
+        // Medical history entries
+        let codableHistory = record.medicalhistory.map { CodableMedicalHistoryEntry(date: $0.date?.timeIntervalSince1970, name: $0.name, contact: $0.contact, informationOrComment: $0.informationOrComment) }
+        if let historyJSON = try? JSONEncoder().encode(codableHistory), let historyString = String(data: historyJSON, encoding: .utf8) {
+            ckRecord["medicalHistoryEntries"] = historyString as NSString
+        }
+
+        // Medical document entries
+        let codableDocuments = record.medicaldocument.map { CodableMedicalDocumentEntry(date: $0.date?.timeIntervalSince1970, name: $0.name, note: $0.note) }
+        if let documentJSON = try? JSONEncoder().encode(codableDocuments), let documentString = String(data: documentJSON, encoding: .utf8) {
+            ckRecord["medicalDocumentEntries"] = documentString as NSString
+        }
+
+        // Human doctor entries
+        let codableDoctors = record.humanDoctors.map { CodableHumanDoctorEntry(uuid: $0.uuid, createdAt: $0.createdAt.timeIntervalSince1970, updatedAt: $0.updatedAt.timeIntervalSince1970, type: $0.type, name: $0.name, phone: $0.phone, email: $0.email, address: $0.address, note: $0.note) }
+        if let doctorsJSON = try? JSONEncoder().encode(codableDoctors), let doctorsString = String(data: doctorsJSON, encoding: .utf8) {
+            ckRecord["humanDoctorEntries"] = doctorsString as NSString
+        }
+        
+        // Weight entries
+        let codableWeights = record.weights.map { CodableWeightEntry(uuid: $0.uuid, createdAt: $0.createdAt.timeIntervalSince1970, updatedAt: $0.updatedAt.timeIntervalSince1970, date: $0.date?.timeIntervalSince1970, weightKg: $0.weightKg, comment: $0.comment) }
+        if let weightsJSON = try? JSONEncoder().encode(codableWeights), let weightsString = String(data: weightsJSON, encoding: .utf8) {
+            ckRecord["weightEntries"] = weightsString as NSString
+        }
+        
+        // Pet yearly cost entries
+        let codablePetCosts = record.petYearlyCosts.map { CodablePetYearlyCostEntry(uuid: $0.uuid, createdAt: $0.createdAt.timeIntervalSince1970, updatedAt: $0.updatedAt.timeIntervalSince1970, date: $0.date.timeIntervalSince1970, year: $0.year, category: $0.category, amount: $0.amount, note: $0.note) }
+        if let petCostsJSON = try? JSONEncoder().encode(codablePetCosts), let petCostsString = String(data: petCostsJSON, encoding: .utf8) {
+            ckRecord["petYearlyCostEntries"] = petCostsString as NSString
+        }
+        
+        // Emergency contacts
+        let codableEmergencyContacts = record.emergencyContacts.map { CodableEmergencyContact(id: $0.id.uuidString, name: $0.name, phone: $0.phone, email: $0.email, note: $0.note) }
+        if let emergencyContactsJSON = try? JSONEncoder().encode(codableEmergencyContacts), let emergencyContactsString = String(data: emergencyContactsJSON, encoding: .utf8) {
+            ckRecord["emergencyContactEntries"] = emergencyContactsString as NSString
+        }
 
         // Simple versioning to allow future schema changes
         ckRecord["schemaVersion"] = 1 as NSNumber

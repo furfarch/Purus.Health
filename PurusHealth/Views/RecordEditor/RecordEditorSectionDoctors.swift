@@ -20,12 +20,13 @@ struct RecordEditorSectionDoctors: View {
             }
 
             ForEach(sortedIndices, id: \.self) { idx in
+                let doctor = record.humanDoctors[idx]
                 VStack(alignment: .leading, spacing: 12) {
                     ContactPickerButton(title: "Pick from Contacts") { contact in
-                        record.humanDoctors[idx].name = contact.displayName
-                        record.humanDoctors[idx].phone = contact.phone
-                        record.humanDoctors[idx].email = contact.email
-                        record.humanDoctors[idx].address = contact.postalAddress
+                        doctor.name = contact.displayName
+                        doctor.phone = contact.phone
+                        doctor.email = contact.email
+                        doctor.address = contact.postalAddress
                         onChange()
                     }
 
@@ -33,8 +34,8 @@ struct RecordEditorSectionDoctors: View {
                         TextField(
                             "Type (e.g., GP)",
                             text: Binding(
-                                get: { record.humanDoctors[idx].type },
-                                set: { record.humanDoctors[idx].type = $0; onChange() }
+                                get: { doctor.type },
+                                set: { doctor.type = $0; onChange() }
                             )
                         )
 
@@ -52,32 +53,32 @@ struct RecordEditorSectionDoctors: View {
                     TextField(
                         "Name",
                         text: Binding(
-                            get: { record.humanDoctors[idx].name },
-                            set: { record.humanDoctors[idx].name = $0; onChange() }
+                            get: { doctor.name },
+                            set: { doctor.name = $0; onChange() }
                         )
                     )
 
                     TextField(
                         "Phone",
                         text: Binding(
-                            get: { record.humanDoctors[idx].phone },
-                            set: { record.humanDoctors[idx].phone = $0; onChange() }
+                            get: { doctor.phone },
+                            set: { doctor.phone = $0; onChange() }
                         )
                     )
 
                     TextField(
                         "Email",
                         text: Binding(
-                            get: { record.humanDoctors[idx].email },
-                            set: { record.humanDoctors[idx].email = $0; onChange() }
+                            get: { doctor.email },
+                            set: { doctor.email = $0; onChange() }
                         )
                     )
 
                     TextField(
                         "Address",
                         text: Binding(
-                            get: { record.humanDoctors[idx].address },
-                            set: { record.humanDoctors[idx].address = $0; onChange() }
+                            get: { doctor.address },
+                            set: { doctor.address = $0; onChange() }
                         ),
                         axis: .vertical
                     )
@@ -86,8 +87,8 @@ struct RecordEditorSectionDoctors: View {
                     TextField(
                         "Note",
                         text: Binding(
-                            get: { record.humanDoctors[idx].note },
-                            set: { record.humanDoctors[idx].note = $0; onChange() }
+                            get: { doctor.note },
+                            set: { doctor.note = $0; onChange() }
                         ),
                         axis: .vertical
                     )
