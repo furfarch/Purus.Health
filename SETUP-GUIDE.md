@@ -73,14 +73,33 @@ git remote -v  # Verify the change
    - Or if not listed yet, click **Specify custom container**
    - Enter: `icloud.com.purus.health`
 
-#### C. Configure CloudKit Dashboard (Optional but Recommended)
+#### C. Configure CloudKit Dashboard (REQUIRED - Schema Upload)
+
+⚠️ **CRITICAL:** CloudKit does NOT auto-create schemas. You MUST manually upload the schema file.
 
 1. Go to [CloudKit Dashboard](https://icloud.developer.apple.com/dashboard/)
 2. Select `icloud.com.purus.health` container
-3. Go to **Schema** section
-4. The app will create schemas automatically, but you can verify:
-   - Record Type: `MedicalRecord`
-   - Custom Zone: `PurusHealthShareZone`
+3. Select **Development** environment (top dropdown)
+4. Go to **Schema** section in left sidebar
+5. Click **Schema** → **Import Schema** button
+6. Upload the file: `cloudkit-development.cdkb` from the project root
+7. Review the schema changes (should add MedicalRecord record type with all fields)
+8. Click **Save Changes**
+9. **IMPORTANT:** After testing, you must deploy schema to Production:
+   - Go to **Schema** → **Deploy Schema Changes**
+   - Review changes
+   - Click **Deploy to Production**
+
+**Schema Fields to Verify:**
+- Record Type: `MedicalRecord`
+- Core fields: `uuid`, `createdAt`, `updatedAt`, `isPet`, `schemaVersion`
+- Personal fields: `personalFamilyName`, `personalGivenName`, etc.
+- Pet fields: `personalName`, `personalAnimalID`, `ownerName`, `ownerPhone`, `ownerEmail`
+- Veterinary fields: `vetClinicName`, `vetContactName`, `vetPhone`, `vetEmail`, `vetAddress`, `vetNote`
+- Emergency fields: `emergencyName`, `emergencyNumber`, `emergencyEmail`
+- Relationship JSON fields: `bloodEntries`, `drugEntries`, `vaccinationEntries`, `allergyEntries`, `illnessEntries`, `riskEntries`, `medicalHistoryEntries`, `medicalDocumentEntries`, `humanDoctorEntries`, `weightEntries`, `petYearlyCostEntries`, `emergencyContactEntries`
+
+**Without uploading this schema, CloudKit sync will NOT work!**
 
 ---
 
@@ -351,10 +370,15 @@ Use this checklist to track your progress:
 
 ### "Data not syncing"
 **Solution:**
-1. Check iCloud account is signed in
-2. Verify container ID matches in code and Developer Portal
-3. Check CloudKit Dashboard for errors
-4. Verify entitlements are correct
+1. **Check CloudKit schema is uploaded** - This is the #1 cause of sync failures
+   - Go to CloudKit Dashboard → Schema → Development
+   - Verify `MedicalRecord` record type exists with all fields
+   - If missing, upload `cloudkit-development.cdkb` file
+2. Check iCloud account is signed in
+3. Verify container ID matches in code and Developer Portal
+4. Check CloudKit Dashboard for errors
+5. Verify entitlements are correct
+6. For production, ensure schema is deployed to Production environment
 
 ### Git remote update not working
 **Solution:**
