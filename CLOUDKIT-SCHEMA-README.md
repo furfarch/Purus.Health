@@ -102,19 +102,28 @@ The `cloudkit-development.cdkb` file defines the following fields:
 - `emergencyEmail` (STRING)
 
 ### Relationship Data as JSON Strings (NEW in PR #46)
-These fields store complex arrays as JSON strings:
-- `bloodEntries` (STRING) - Blood test results
-- `drugEntries` (STRING) - Medications
-- `vaccinationEntries` (STRING) - Vaccination records
-- `allergyEntries` (STRING) - Allergies
-- `illnessEntries` (STRING) - Illnesses
-- `riskEntries` (STRING) - Health risks
-- `medicalHistoryEntries` (STRING) - Medical history
-- `medicalDocumentEntries` (STRING) - Documents
-- `humanDoctorEntries` (STRING) - Doctor contacts
-- `weightEntries` (STRING) - Weight tracking
-- `petYearlyCostEntries` (STRING) - Pet expenses
-- `emergencyContactEntries` (STRING) - Emergency contacts
+These fields store arrays of entries as JSON strings. Each JSON array contains 0-n entries with ALL their data (dates, names, comments, etc.):
+
+- `bloodEntries` (STRING) - JSON array of blood test results: `[{date, name, comment}, ...]`
+- `drugEntries` (STRING) - JSON array of medications: `[{date, nameAndDosage, comment}, ...]`
+- `vaccinationEntries` (STRING) - JSON array of vaccinations: `[{date, name, information, place, comment}, ...]`
+- `allergyEntries` (STRING) - JSON array of allergies: `[{date, name, information, comment}, ...]`
+- `illnessEntries` (STRING) - JSON array of illnesses: `[{date, name, informationOrComment}, ...]`
+- `riskEntries` (STRING) - JSON array of health risks: `[{date, name, descriptionOrComment}, ...]`
+- `medicalHistoryEntries` (STRING) - JSON array of medical history: `[{date, name, contact, informationOrComment}, ...]`
+- `medicalDocumentEntries` (STRING) - JSON array of documents: `[{date, name, note}, ...]`
+- `humanDoctorEntries` (STRING) - JSON array of doctors: `[{uuid, createdAt, updatedAt, type, name, phone, email, address, note}, ...]`
+- `weightEntries` (STRING) - JSON array of weight entries: `[{uuid, createdAt, updatedAt, date, weightKg, comment}, ...]`
+- `petYearlyCostEntries` (STRING) - JSON array of pet costs: `[{uuid, createdAt, updatedAt, date, year, category, amount, note}, ...]`
+- `emergencyContactEntries` (STRING) - JSON array of emergency contacts: `[{id, name, phone, email, note}, ...]`
+
+**Example:** A `vaccinationEntries` field might contain:
+```json
+[{"date":1708041600,"name":"COVID-19","information":"Pfizer","place":"Hospital","comment":"No issues"},
+ {"date":1710720000,"name":"Flu","information":"Annual","place":"Pharmacy","comment":"OK"}]
+```
+
+See `CLOUDKIT-JSON-EXAMPLE.md` for detailed examples of how data is serialized.
 
 ## Troubleshooting
 
