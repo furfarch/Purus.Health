@@ -1,6 +1,6 @@
 # Purus Health
 
-**Part of the Simply Series** - Minimalist apps focused on one tracking task at a time.
+**Part of the purus Series** - Minimalist apps focused on one tracking task at a time.
 
 A SwiftUI-based iOS and macOS application for managing personal medical records with CloudKit integration for cloud synchronization and sharing.
 
