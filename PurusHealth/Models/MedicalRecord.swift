@@ -29,7 +29,8 @@ final class MedicalRecord {
     var isPet: Bool = false
     var personalName: String = ""
     var personalAnimalID: String = ""
-    var petBred: String = ""
+    var petBreed: String = ""
+    var petColor: String = ""
     var ownerName: String = ""
     var ownerPhone: String = ""
     var ownerEmail: String = ""
