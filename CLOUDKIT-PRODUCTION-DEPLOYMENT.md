@@ -18,8 +18,9 @@ deletedAt    TIMESTAMP
 - Using TIMESTAMP ensures full date-time information is preserved
 
 **In CloudKit Dashboard:**
-- When creating the field, select type: **Date** (CloudKit's UI calls it "Date" but it's actually a timestamp)
-- CloudKit will store the full date-time value
+- When creating the field, select type: **DATE/TIME**
+- This is what CloudKit Dashboard calls the TIMESTAMP type
+- It stores the full date-time value with timezone
 
 ### Question 2: What Content Remains in Tombstone?
 
@@ -72,7 +73,7 @@ Add these two fields:
 
 **Field 2:**
 - Field Name: `deletedAt`
-- Type: `Date`
+- Type: `DATE/TIME`
 - Make it: Sortable, Queryable
 
 ### Step 3: Deploy Schema
@@ -126,7 +127,7 @@ For direct production deployment:
 
 - [ ] Upload schema to CloudKit Dashboard (Production environment)
 - [ ] Add `isDeleted` field (Int64)
-- [ ] Add `deletedAt` field (Date)
+- [ ] Add `deletedAt` field (DATE/TIME)
 - [ ] Deploy schema changes
 - [ ] Verify fields exist in Production
 - [ ] Check custom zone `PurusHealthShareZone` has fields
