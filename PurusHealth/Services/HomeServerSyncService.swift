@@ -26,7 +26,7 @@ final class HomeServerSyncService: ObservableObject {
             case .http(401):
                 return HomeServerSettings.isPaired
                     ? "This device is not paired any more (removed in Home › Devices). Pair it again."
-                    : "This device is not paired yet. Add it in purus.HEALTH web › Settings › Devices."
+                    : "This device is not paired yet. Add it in Home › Devices."
             case .http(let code): return "Home server answered with HTTP \(code)."
             case .badResponse(let s): return s
             case .backupFailed(let s): return "Backup before replacing failed: \(s)"

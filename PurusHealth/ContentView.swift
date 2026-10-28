@@ -21,21 +21,40 @@ struct ContentView: View {
     @State private var showShareErrorAlert: Bool = false
     @State private var shareErrorMessage: String = ""
 
-    // Result of a home server pairing link
-    @State private var pairingResult: Bool?
+    // Result of a home server pairing link: paired -> home server is switched on right away
+    @State private var pairingTitle: String?
+    @State private var pairingMessage: String = ""
 
     var body: some View {
         RecordListView()
             .onReceive(NotificationCenter.default.publisher(for: HomeServerPairing.didPair)) { notif in
-                pairingResult = (notif.userInfo?["ok"] as? Bool) ?? false
+                let ok = (notif.userInfo?["ok"] as? Bool) ?? false
+                guard ok else {
+                    pairingMessage = "The pairing code is not valid. Add the device again in Home › Devices."
+                    pairingTitle = "Pairing failed"
+                    return
+                }
+                if HomeServerSettings.isEnabled {
+                    pairingMessage = "This device uses the home server with the new pairing."
+                    pairingTitle = "Device paired"
+                    return
+                }
+                Task { @MainActor in
+                    do {
+                        try await HomeServerSyncService.shared.enable()
+                        pairingMessage = "The home server is now the main copy. A backup of the previous data on this device is in the emergency copy folder."
+                        pairingTitle = "Home server on"
+                    } catch {
+                        pairingMessage = "The device is paired, but switching to the home server failed: \(error.localizedDescription) Try again in Settings › Home Server."
+                        pairingTitle = "Device paired"
+                    }
+                }
             }
-            .alert(pairingResult == true ? "Device paired" : "Pairing failed",
-                   isPresented: Binding(get: { pairingResult != nil }, set: { if !$0 { pairingResult = nil } })) {
-                Button("OK", role: .cancel) { pairingResult = nil }
+            .alert(pairingTitle ?? "",
+                   isPresented: Binding(get: { pairingTitle != nil }, set: { if !$0 { pairingTitle = nil } })) {
+                Button("OK", role: .cancel) { pairingTitle = nil }
             } message: {
-                Text(pairingResult == true
-                     ? "This device can now use the home server. Turn it on in Settings › Home Server."
-                     : "The pairing code is not valid. Add the device again in purus.HEALTH web › Settings › Devices.")
+                Text(pairingMessage)
             }
             .onOpenURL { url in
                 // Home server pairing link (QR code from purus.HEALTH web) - not a share

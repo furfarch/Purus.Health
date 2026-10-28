@@ -55,10 +55,9 @@ enum HomeServerSettings {
         set { UserDefaults.standard.set(newValue, forKey: pairedAtKey) }
     }
 
-    /// Web page where a device is added (purus.HEALTH web › Settings › Devices), on the same host as the API.
+    /// Web page where a device is added: Home › Devices (central device management, KB Home devices).
     static var addDeviceURL: URL? {
-        guard let api = apiURL, let host = api.host, let scheme = api.scheme else { return nil }
-        return URL(string: "\(scheme)://\(host)/health/#settings")
+        URL(string: "https://home.ds8152f54.synology.me/devices.html")
     }
 
     static func unpair() {
@@ -98,7 +97,7 @@ enum HomeServerSettings {
     }
 }
 
-/// Pairing with the home server (KB Home devices). The code comes from purus.HEALTH web › Settings › Devices:
+/// Pairing with the home server (KB Home devices). The code comes from Home › Devices:
 /// QR code = purushealth://pair?code=ph1.<key>&server=<https API address> (opened by the Camera app), or the pasted code.
 enum HomeServerPairing {
     static let didPair = Notification.Name("homeServer.didPair")

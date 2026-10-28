@@ -69,7 +69,7 @@ struct HomeServerSettingsView: View {
                 } else {
                     Button("Paste pairing code") { pasteCode() }
                     if let url = HomeServerSettings.addDeviceURL {
-                        Link("Add this device in purus.HEALTH web", destination: url)
+                        Link("Add this device in Home › Devices", destination: url)
                     }
                 }
                 if let pasteResult {
@@ -80,7 +80,7 @@ struct HomeServerSettingsView: View {
             } footer: {
                 Text(isPaired
                      ? "See or remove this device in Home › Devices. Turn the home server off before removing the pairing here."
-                     : "Add the device in purus.HEALTH web › Settings › Devices. Then scan the QR code with the Camera app, or copy the code and tap Paste pairing code.")
+                     : "Add the device in Home › Devices. Then scan the QR code with the Camera app, or copy the code and tap Paste pairing code. The app then switches to the home server by itself.")
             }
 
             if isEnabled {
@@ -192,6 +192,8 @@ struct HomeServerSettingsView: View {
         if HomeServerPairing.pair(text: text) {
             pasteResult = nil
             refreshPairing()
+            // paired -> switch to the home server right away
+            if !isEnabled { Task { await connect() } }
         } else {
             pasteResult = text.isEmpty ? "Nothing to paste. Copy the pairing code first." : "This is not a valid pairing code."
         }
