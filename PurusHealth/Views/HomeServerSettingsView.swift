@@ -158,7 +158,7 @@ struct HomeServerSettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("All records on this device are replaced with the data from the home server. A backup of the current data is saved to the emergency copy folder first. Nothing from this device is sent to the server.")
+            Text("All records on this device are replaced with the data from the home server. While the home server is on, the app shows only the home server data. Your iCloud data is not shown and not synced, but it is not deleted: it comes back when you turn the home server off. A backup of the current data is saved to the emergency copy folder first. Nothing from this device is sent to the server.")
         }
         .alert("Turn off home server?", isPresented: $showTurnOffConfirm) {
             Button("Turn off", role: .destructive) {
@@ -217,6 +217,7 @@ struct HomeServerSettingsView: View {
         do {
             try await sync.enable()
             isEnabled = true
+            errorMessage = "Home server on. While the home server is on, the app shows only the home server data. Your iCloud data is not shown and not synced, but it is not deleted: it comes back when you turn the home server off."
         } catch {
             isEnabled = false
             errorMessage = error.localizedDescription

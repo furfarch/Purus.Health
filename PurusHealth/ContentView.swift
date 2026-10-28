@@ -42,7 +42,7 @@ struct ContentView: View {
                 Task { @MainActor in
                     do {
                         try await HomeServerSyncService.shared.enable()
-                        pairingMessage = "The home server is now the main copy. A backup of the previous data on this device is in the emergency copy folder."
+                        pairingMessage = "The home server is now the main copy. While the home server is on, the app shows only the home server data. Your iCloud data is not shown and not synced, but it is not deleted: it comes back when you turn the home server off. A backup of the previous data on this device is in the emergency copy folder."
                         pairingTitle = "Home server on"
                     } catch {
                         pairingMessage = "The device is paired, but switching to the home server failed: \(error.localizedDescription) Try again in Settings › Home Server."
