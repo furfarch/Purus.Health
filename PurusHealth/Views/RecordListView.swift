@@ -3,6 +3,19 @@ import SwiftData
 
 struct RecordListView: View {
     @Environment(\.modelContext) private var modelContext
+    // Wide screen (iPhone Duo unfolded, iPad): two columns, list left, record or settings right.
+    // Narrow screen (folded, iPhone): one column as before.
+    // The Duo reports a compact width even unfolded, so the real width decides too (two columns from 560 points; the Duo unfolded in landscape gives the app 594).
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @State private var screenWidth: CGFloat = 0
+    private var isWide: Bool { horizontalSizeClass == .regular || screenWidth >= 560 }
+
+    enum Detail: Hashable {
+        case record(String)   // MedicalRecord.uuid (stable; the model id changes when a new record is saved)
+        case settings
+    }
+    @State private var detail: Detail? = nil
+    @State private var detailStartEditing: Bool = false
     @Query private var allRecords: [MedicalRecord]
     
     private var records: [MedicalRecord] {
@@ -18,7 +31,80 @@ struct RecordListView: View {
     @State private var isRefreshing: Bool = false
 
     var body: some View {
-        NavigationStack {
+        Group {
+            if isWide {
+                // fixed two columns (the system split view shows the list only as an overlay on the Duo)
+                HStack(spacing: 0) {
+                    NavigationStack {
+                        recordList
+                    }
+                    .frame(width: min(320, max(240, screenWidth * 0.36)))
+                    Divider()
+                    detailView
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+            } else {
+                NavigationStack {
+                    recordList
+                }
+            }
+        }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { screenWidth = $0 }
+        .task {
+            await CloudKitMedicalRecordFetcher(containerIdentifier: AppConfig.CloudKit.containerID).ensurePrivateDBSubscription()
+            await ensureSharedDBSubscription(containerIdentifier: AppConfig.CloudKit.containerID)
+        }
+        .sheet(item: $activeRecord, onDismiss: { activeRecord = nil; startEditing = false }) { record in
+            NavigationStack {
+                RecordEditorView(record: record, startEditing: startEditing)
+            }
+        }
+        .sheet(isPresented: $showAbout) { AboutView() }
+        .sheet(isPresented: $showSettings) { SettingsView() }
+        .alert("Save Error", isPresented: Binding(get: { saveErrorMessage != nil }, set: { if !$0 { saveErrorMessage = nil } })) {
+            Button("OK", role: .cancel) { saveErrorMessage = nil }
+        } message: {
+            Text(saveErrorMessage ?? "Unknown error")
+        }
+        .overlay {
+            if isRefreshing {
+                ZStack {
+                    Color.black.opacity(0.2).ignoresSafeArea()
+                    VStack(spacing: 8) {
+                        ProgressView()
+                        Text("Syncing…")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(16)
+                    .background(.ultraThinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+            }
+        }
+    }
+
+    /// Right column on wide screens.
+    @ViewBuilder
+    private var detailView: some View {
+        switch detail {
+        case .record(let id):
+            if let record = records.first(where: { $0.uuid == id }) {
+                NavigationStack {
+                    RecordEditorView(record: record, startEditing: detailStartEditing)
+                }
+                .id(id)
+            } else {
+                ContentUnavailableView("Select a record", systemImage: "person.text.rectangle")
+            }
+        case .settings:
+            SettingsView(showsClose: false)
+        case nil:
+            ContentUnavailableView("Select a record", systemImage: "person.text.rectangle")
+        }
+    }
+
+    private var recordList: some View {
             List {
                 listContent
             }
@@ -40,7 +126,7 @@ struct RecordListView: View {
 
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
-                        showSettings = true
+                        if isWide { detail = .settings } else { showSettings = true }
                     } label: {
                         Image(systemName: "gearshape")
                     }
@@ -100,39 +186,6 @@ struct RecordListView: View {
                 }
                 #endif
             }
-            .task {
-                await CloudKitMedicalRecordFetcher(containerIdentifier: AppConfig.CloudKit.containerID).ensurePrivateDBSubscription()
-                await ensureSharedDBSubscription(containerIdentifier: AppConfig.CloudKit.containerID)
-            }
-            .sheet(item: $activeRecord, onDismiss: { activeRecord = nil; startEditing = false }) { record in
-                NavigationStack {
-                    RecordEditorView(record: record, startEditing: startEditing)
-                }
-            }
-            .sheet(isPresented: $showAbout) { AboutView() }
-            .sheet(isPresented: $showSettings) { SettingsView() }
-            .alert("Save Error", isPresented: Binding(get: { saveErrorMessage != nil }, set: { if !$0 { saveErrorMessage = nil } })) {
-                Button("OK", role: .cancel) { saveErrorMessage = nil }
-            } message: {
-                Text(saveErrorMessage ?? "Unknown error")
-            }
-            .overlay {
-                if isRefreshing {
-                    ZStack {
-                        Color.black.opacity(0.2).ignoresSafeArea()
-                        VStack(spacing: 8) {
-                            ProgressView()
-                            Text("Syncing…")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(16)
-                        .background(.ultraThinMaterial)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
-                }
-            }
-        }
     }
 
     private func addRecord(isPet: Bool) {
@@ -152,6 +205,12 @@ struct RecordListView: View {
             catch { saveErrorMessage = "Save failed: \(error.localizedDescription)" }
         }
 
+        // Wide screen: open the new record on the right, in edit mode. Narrow: sheet as before.
+        if isWide {
+            detailStartEditing = true
+            detail = .record(record.uuid)
+            return
+        }
         // Ensure the `startEditing` state is set before presenting the sheet so the editor opens in edit mode.
         startEditing = true
         activeRecord = record
@@ -198,9 +257,30 @@ struct RecordListView: View {
                 .frame(maxWidth: .infinity, alignment: .center)
         } else {
             ForEach(records, id: \.persistentModelID) { record in
-                NavigationLink {
-                    RecordEditorView(record: record, startEditing: false)
-                } label: {
+                if isWide {
+                    // opens the record in the right column
+                    Button {
+                        detailStartEditing = false
+                        detail = .record(record.uuid)
+                    } label: {
+                        rowLabel(record)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .listRowBackground(detail == .record(record.uuid) ? Color.accentColor.opacity(0.15) : nil)
+                } else {
+                    NavigationLink {
+                        RecordEditorView(record: record, startEditing: false)
+                    } label: {
+                        rowLabel(record)
+                    }
+                }
+            }
+            .onDelete(perform: deleteRecords)
+        }
+    }
+
+    private func rowLabel(_ record: MedicalRecord) -> some View {
                     HStack {
                         Image(systemName: record.isPet ? "cat" : "person")
 
@@ -218,10 +298,6 @@ struct RecordListView: View {
                             .accessibilityLabel(record.locationStatus.accessibilityLabel)
                             .accessibilityIdentifier("recordLocationStatusIcon")
                     }
-                }
-            }
-            .onDelete(perform: deleteRecords)
-        }
     }
 
     @MainActor

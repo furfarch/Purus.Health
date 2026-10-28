@@ -3,6 +3,8 @@ import CloudKit
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
+    /// false when shown as the right column on a wide screen (no sheet to close)
+    var showsClose: Bool = true
     @State private var accountStatus: CKAccountStatus?
     @State private var accountStatusError: String?
 
@@ -92,7 +94,7 @@ struct SettingsView: View {
             .toolbar {
                 #if os(macOS)
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Close") { dismiss() }
+                    if showsClose { Button("Close") { dismiss() } }
                 }
                 #endif
             }
