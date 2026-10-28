@@ -59,6 +59,9 @@ struct PurusHealthApp: App {
 
         // Ensure the fetcher has the model context so imports can run
         self.cloudFetcher.setModelContext(self.modelContainer.mainContext)
+
+        // Home server sync (optional mode)
+        HomeServerSyncService.shared.configure(container: self.modelContainer)
     }
 
     var body: some Scene {
@@ -66,6 +69,12 @@ struct PurusHealthApp: App {
             ContentView()
                 .environment(\.modelContext, modelContainer.mainContext)
                 .task {
+                    // Home server mode: the home server is the main copy, iCloud sync is paused.
+                    if HomeServerSettings.isEnabled {
+                        await HomeServerSyncService.shared.sync()
+                        return
+                    }
+
                     // Only trigger cloud fetch if user has enabled cloud sync or has cloud-enabled records.
                     // This prevents re-importing records that were deleted locally when cloud sync is off.
                     if await shouldFetchFromCloud() {
@@ -92,6 +101,11 @@ struct PurusHealthApp: App {
                     // Sync when app becomes active to get latest changes
                     if newPhase == .active {
                         Task { @MainActor in
+                            if HomeServerSettings.isEnabled {
+                                await HomeServerSyncService.shared.sync()
+                                return
+                            }
+
                             // Only sync if user has cloud-enabled records
                             if await shouldFetchFromCloud() {
                                 cloudFetcher.fetchChanges()

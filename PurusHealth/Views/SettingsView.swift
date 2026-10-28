@@ -26,12 +26,30 @@ struct SettingsView: View {
                     }
                 }
 
-                Section("iCloud") {
+                Section {
                     NavigationLink {
-                        CloudRecordSettingsView()
+                        HomeServerSettingsView()
                     } label: {
-                        Label("iCloud Sync and Sharing of Records", systemImage: "icloud")
+                        Label("Home Server", systemImage: "server.rack")
                     }
+                }
+
+                Section {
+                    if HomeServerSettings.isEnabled {
+                        Text("iCloud sync and sharing are paused while the home server is on.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        NavigationLink {
+                            CloudRecordSettingsView()
+                        } label: {
+                            Label("iCloud Sync and Sharing of Records", systemImage: "icloud")
+                        }
+                    }
+                } header: {
+                    Text("iCloud")
+                }
+
+                Section {
 
                     /*
                     NavigationLink {

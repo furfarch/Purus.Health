@@ -33,6 +33,8 @@ final class CloudKitSharedZoneMedicalRecordFetcher {
     /// Fetch shared records across all shared record zones and merge them into SwiftData.
     /// Returns the number of fetched records.
     func fetchAllSharedAcrossZonesAsync() async throws -> Int {
+        // Home server mode: iCloud sync is paused
+        if HomeServerSettings.isEnabled { return 0 }
         let zones = try await fetchAllRecordZones()
         guard !zones.isEmpty else { return 0 }
 

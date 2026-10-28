@@ -4,6 +4,8 @@ enum MedicalRecordMapper {
     private static let iso8601: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withFullDate]
+        // Dates are picked as local days; format them in the local time zone (UTC shifted them by a day)
+        f.timeZone = TimeZone.current
         return f
     }()
 

@@ -59,6 +59,8 @@ class CloudKitMedicalRecordFetcher: ObservableObject {
     /// - pull to refresh
     /// - app becomes active
     func fetchChanges() {
+        // Home server mode: iCloud sync is paused
+        if HomeServerSettings.isEnabled { return }
         guard !isLoading else { return }
         isLoading = true
         error = nil
@@ -231,7 +233,9 @@ class CloudKitMedicalRecordFetcher: ObservableObject {
 
     /// Async API: fetch all records and import them into local SwiftData; returns number of fetched records.
     func fetchAllAsync() async throws -> Int {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Int, Error>) in
+        // Home server mode: iCloud sync is paused
+        if HomeServerSettings.isEnabled { return 0 }
+        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Int, Error>) in
             isLoading = true
             error = nil
             let query = CKQuery(recordType: recordType, predicate: NSPredicate(value: true))

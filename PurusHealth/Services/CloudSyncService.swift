@@ -112,6 +112,8 @@ final class CloudSyncService {
     // MARK: - Sync
 
     func syncIfNeeded(record: MedicalRecord) async throws {
+        // Home server mode: iCloud sync is paused
+        if HomeServerSettings.isEnabled { return }
         guard record.isCloudEnabled else { return }
 
         // Do not resurrect locally deleted records

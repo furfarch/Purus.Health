@@ -3,6 +3,8 @@ import SwiftData
 
 @Model
 final class MedicalHistoryEntry {
+    // Home server row id (empty until first home server sync)
+    var syncID: String = ""
     var date: Date? = nil
     var name: String = ""
     var contact: String = ""

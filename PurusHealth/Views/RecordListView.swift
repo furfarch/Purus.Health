@@ -163,7 +163,9 @@ struct RecordListView: View {
                 let record = records[index]
 
                 // If this record participates in CloudKit (owner or shared), delete from CloudKit first.
-                if record.isCloudEnabled || record.isSharingEnabled || record.cloudShareRecordName != nil || record.cloudRecordName != nil {
+                // Not in home server mode: iCloud is paused there and the iCloud copy stays untouched.
+                if !HomeServerSettings.isEnabled,
+                   record.isCloudEnabled || record.isSharingEnabled || record.cloudShareRecordName != nil || record.cloudRecordName != nil {
                     do {
                         try await CloudSyncService.shared.deleteSyncRecord(forLocalRecord: record)
                         SharedImportSuppression.suppress(record.uuid)
@@ -224,6 +226,11 @@ struct RecordListView: View {
 
     @MainActor
     private func refreshFromCloud() async {
+        if HomeServerSettings.isEnabled {
+            await HomeServerSyncService.shared.sync()
+            return
+        }
+
         let wantsCloudRefresh = allRecords.contains(where: { $0.isCloudEnabled || $0.locationStatus == .shared })
         guard wantsCloudRefresh else { return }
 
