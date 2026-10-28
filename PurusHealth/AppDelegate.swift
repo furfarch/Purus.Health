@@ -22,6 +22,12 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
         // Check for share URL in URL contexts (cold launch via URL scheme)
         for context in connectionOptions.urlContexts {
+            if HomeServerPairing.isPairingURL(context.url) {
+                // wait until the SwiftUI view listens for the result
+                let url = context.url
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { HomeServerPairing.handle(url: url) }
+                continue
+            }
             handleShareURL(context.url)
         }
 
@@ -33,6 +39,10 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     // Called when app is ALREADY RUNNING and receives a URL
     func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        // Home server pairing link (QR code from purus.HEALTH web) - handled here, never as a share
+        var URLContexts = URLContexts
+        for context in URLContexts where HomeServerPairing.handle(url: context.url) { URLContexts.remove(context) }
+        if URLContexts.isEmpty { return }
         ShareDebugStore.shared.appendLog("SceneDelegate: openURLContexts called, count=\(URLContexts.count)")
         showDebugAlert("openURLContexts", message: "Received \(URLContexts.count) URL(s)")
         for context in URLContexts {

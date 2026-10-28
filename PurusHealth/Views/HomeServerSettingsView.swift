@@ -6,7 +6,10 @@ struct HomeServerSettingsView: View {
 
     @State private var isEnabled: Bool = HomeServerSettings.isEnabled
     @State private var urlString: String = HomeServerSettings.urlString
-    @State private var appKey: String = HomeServerSettings.appKey
+    @State private var isPaired: Bool = HomeServerSettings.isPaired
+    @State private var pairedAt: Date? = HomeServerSettings.pairedAt
+    @State private var pasteResult: String?
+    @State private var showUnpairConfirm = false
     @State private var testResult: String?
     @State private var isTesting = false
     @State private var isConnecting = false
@@ -24,7 +27,7 @@ struct HomeServerSettingsView: View {
                         if newValue { showReplaceConfirm = true } else { showTurnOffConfirm = true }
                     }
                 ))
-                .disabled(isConnecting || sync.isSyncing)
+                .disabled(isConnecting || sync.isSyncing || (!isEnabled && !isPaired))
             } footer: {
                 Text("When on, your home server is the main copy of all records and iCloud sync is paused. When off, the app works with iCloud as before.")
             }
@@ -35,10 +38,6 @@ struct HomeServerSettingsView: View {
                     .autocorrectionDisabled()
                     .keyboardType(.URL)
                     .onSubmit { HomeServerSettings.urlString = urlString }
-                SecureField("App key (for access from outside home)", text: $appKey)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .onSubmit { HomeServerSettings.appKey = appKey }
                 Button {
                     Task { await testConnection() }
                 } label: {
@@ -53,6 +52,35 @@ struct HomeServerSettingsView: View {
                         .font(.caption)
                         .foregroundStyle(testResult == "Connected" ? .green : .red)
                 }
+            }
+
+            Section {
+                if isPaired {
+                    HStack {
+                        Text("Paired")
+                        Spacer()
+                        if let pairedAt {
+                            Text(pairedAt, format: .dateTime.day().month().year())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Button("Remove pairing from this device", role: .destructive) { showUnpairConfirm = true }
+                        .disabled(isEnabled)
+                } else {
+                    Button("Paste pairing code") { pasteCode() }
+                    if let url = HomeServerSettings.addDeviceURL {
+                        Link("Add this device in purus.HEALTH web", destination: url)
+                    }
+                }
+                if let pasteResult {
+                    Text(pasteResult).font(.caption).foregroundStyle(.red)
+                }
+            } header: {
+                Text("Pairing")
+            } footer: {
+                Text(isPaired
+                     ? "See or remove this device in Home › Devices. Turn the home server off before removing the pairing here."
+                     : "Add the device in purus.HEALTH web › Settings › Devices. Then scan the QR code with the Camera app, or copy the code and tap Paste pairing code.")
             }
 
             if isEnabled {
@@ -113,7 +141,16 @@ struct HomeServerSettingsView: View {
         .task { copyFolder = await EmergencyCopyService.folderDescription() }
         .onDisappear {
             HomeServerSettings.urlString = urlString
-            HomeServerSettings.appKey = appKey
+        }
+        .onReceive(NotificationCenter.default.publisher(for: HomeServerPairing.didPair)) { _ in refreshPairing() }
+        .alert("Remove pairing?", isPresented: $showUnpairConfirm) {
+            Button("Remove", role: .destructive) {
+                HomeServerSettings.unpair()
+                refreshPairing()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This device can no longer use the home server until it is paired again. To block it on the server too, remove it in Home › Devices.")
         }
         .alert("Replace data on this device?", isPresented: $showReplaceConfirm) {
             Button("Replace with server data", role: .destructive) {
@@ -141,7 +178,23 @@ struct HomeServerSettingsView: View {
 
     private func saveFields() {
         HomeServerSettings.urlString = urlString
-        HomeServerSettings.appKey = appKey
+    }
+
+    private func refreshPairing() {
+        isPaired = HomeServerSettings.isPaired
+        pairedAt = HomeServerSettings.pairedAt
+        urlString = HomeServerSettings.urlString
+        if isPaired { pasteResult = nil }
+    }
+
+    private func pasteCode() {
+        let text = UIPasteboard.general.string ?? ""
+        if HomeServerPairing.pair(text: text) {
+            pasteResult = nil
+            refreshPairing()
+        } else {
+            pasteResult = text.isEmpty ? "Nothing to paste. Copy the pairing code first." : "This is not a valid pairing code."
+        }
     }
 
     private func testConnection() async {

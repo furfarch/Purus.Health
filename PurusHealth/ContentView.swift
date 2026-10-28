@@ -21,9 +21,25 @@ struct ContentView: View {
     @State private var showShareErrorAlert: Bool = false
     @State private var shareErrorMessage: String = ""
 
+    // Result of a home server pairing link
+    @State private var pairingResult: Bool?
+
     var body: some View {
         RecordListView()
+            .onReceive(NotificationCenter.default.publisher(for: HomeServerPairing.didPair)) { notif in
+                pairingResult = (notif.userInfo?["ok"] as? Bool) ?? false
+            }
+            .alert(pairingResult == true ? "Device paired" : "Pairing failed",
+                   isPresented: Binding(get: { pairingResult != nil }, set: { if !$0 { pairingResult = nil } })) {
+                Button("OK", role: .cancel) { pairingResult = nil }
+            } message: {
+                Text(pairingResult == true
+                     ? "This device can now use the home server. Turn it on in Settings › Home Server."
+                     : "The pairing code is not valid. Add the device again in purus.HEALTH web › Settings › Devices.")
+            }
             .onOpenURL { url in
+                // Home server pairing link (QR code from purus.HEALTH web) - not a share
+                if HomeServerPairing.handle(url: url) { return }
                 // Accept CloudKit share links and import shared records.
                 Task { @MainActor in
                     await CloudKitShareAcceptanceService.shared.acceptShare(from: url, modelContext: modelContext)

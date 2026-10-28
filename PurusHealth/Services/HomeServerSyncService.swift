@@ -23,6 +23,10 @@ final class HomeServerSyncService: ObservableObject {
         var errorDescription: String? {
             switch self {
             case .noURL: return "No home server address set."
+            case .http(401):
+                return HomeServerSettings.isPaired
+                    ? "This device is not paired any more (removed in Home › Devices). Pair it again."
+                    : "This device is not paired yet. Add it in purus.HEALTH web › Settings › Devices."
             case .http(let code): return "Home server answered with HTTP \(code)."
             case .badResponse(let s): return s
             case .backupFailed(let s): return "Backup before replacing failed: \(s)"
@@ -198,8 +202,8 @@ final class HomeServerSyncService: ObservableObject {
         var req = URLRequest(url: url, timeoutInterval: 30)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let key = HomeServerSettings.appKey
-        if !key.isEmpty { req.setValue(key, forHTTPHeaderField: "X-App-Key") }
+        let key = HomeServerSettings.deviceKey
+        if !key.isEmpty { req.setValue(key, forHTTPHeaderField: "X-Device-Key") }
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
         let (data, response) = try await URLSession.shared.data(for: req)
         let code = (response as? HTTPURLResponse)?.statusCode ?? 0
