@@ -24,6 +24,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Purus Health uses Face ID to unlock the app.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Purus Health connects to your home server on the local network to sync your records.</string>
 	<key>NSUbiquitousContainers</key>

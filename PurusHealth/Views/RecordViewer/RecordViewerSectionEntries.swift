@@ -10,7 +10,6 @@ struct RecordViewerSectionEntries: View {
             if rows.isEmpty {
                 Text("No entries")
                     .foregroundStyle(.secondary)
-                    .padding(.horizontal)
                     .padding(.vertical, 12)
             } else {
                 VStack(spacing: 0) {
@@ -23,19 +22,20 @@ struct RecordViewerSectionEntries: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
-                    .padding(.horizontal)
+                    .padding(.horizontal, 6)
                     .padding(.vertical, 8)
-                    .background(.quaternary)
+                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
 
                     // Rows
                     ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                         HStack(alignment: .top) {
                             ForEach(Array(row.enumerated()), id: \.offset) { _, value in
                                 Text(value.isEmpty ? "—" : value)
+                                    .monospacedDigit()
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
                         }
-                        .padding(.horizontal)
+                        .padding(.horizontal, 6)
                         .padding(.vertical, 10)
 
                         Divider()

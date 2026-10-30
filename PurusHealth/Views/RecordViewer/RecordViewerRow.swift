@@ -5,17 +5,13 @@ struct RecordViewerRow: View {
     let value: String
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(title)
-                .foregroundStyle(.secondary)
-                .frame(width: 170, alignment: .leading)
-
+        // FinAI style: label left, value right
+        LabeledContent(title) {
             Text(value.isEmpty ? "—" : value)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .multilineTextAlignment(.trailing)
         }
         .font(.body)
         .padding(.vertical, 6)
-        .padding(.horizontal)
     }
 }
 

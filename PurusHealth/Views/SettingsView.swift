@@ -14,9 +14,7 @@ struct SettingsView: View {
 
     private let containerIdentifier = AppConfig.CloudKit.containerID
 
-    // Display settings
-    @AppStorage("recordViewerStyle") private var viewerStyle: String = "cards"
-
+    
     var body: some View {
         NavigationStack {
             List {
@@ -79,6 +77,14 @@ struct SettingsView: View {
                     }
 
                     // Export Share Logs removed for Release per request.
+                }
+
+                Section {
+                    NavigationLink {
+                        AboutView()
+                    } label: {
+                        Label("About", systemImage: "info.circle")
+                    }
                 }
             }
             .navigationTitle("Settings")

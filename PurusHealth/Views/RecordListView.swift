@@ -25,7 +25,6 @@ struct RecordListView: View {
     @State private var activeRecord: MedicalRecord? = nil
     @State private var showEditor: Bool = false
     @State private var startEditing: Bool = false
-    @State private var showAbout: Bool = false
     @State private var showSettings: Bool = false
     @State private var saveErrorMessage: String?
     @State private var isRefreshing: Bool = false
@@ -59,7 +58,6 @@ struct RecordListView: View {
                 RecordEditorView(record: record, startEditing: startEditing)
             }
         }
-        .sheet(isPresented: $showAbout) { AboutView() }
         .sheet(isPresented: $showSettings) { SettingsView() }
         .alert("Save Error", isPresented: Binding(get: { saveErrorMessage != nil }, set: { if !$0 { saveErrorMessage = nil } })) {
             Button("OK", role: .cancel) { saveErrorMessage = nil }
@@ -118,14 +116,6 @@ struct RecordListView: View {
                 #if os(iOS) || targetEnvironment(macCatalyst)
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
-                        showAbout = true
-                    } label: {
-                        Image(systemName: "info.circle")
-                    }
-                }
-
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
                         if isWide { detail = .settings } else { showSettings = true }
                     } label: {
                         Image(systemName: "gearshape")
@@ -151,14 +141,6 @@ struct RecordListView: View {
                 }
                 #else
                 // macOS: use automatic placements so toolbar items render in the mac toolbar
-                ToolbarItem(placement: .automatic) {
-                    Button {
-                        showAbout = true
-                    } label: {
-                        Image(systemName: "info.circle")
-                    }
-                }
-
                 ToolbarItem(placement: .automatic) {
                     Button {
                         showSettings = true

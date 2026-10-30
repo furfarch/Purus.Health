@@ -13,6 +13,11 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         let activityCount = connectionOptions.userActivities.count
         ShareDebugStore.shared.appendLog("SceneDelegate: willConnectTo called, urlContexts=\(urlCount), userActivities=\(activityCount)")
 
+        // Face ID lock screen is up before the first frame
+        if let windowScene = scene as? UIWindowScene {
+            MainActor.assumeIsolated { AppLock.shared.attach(windowScene) }
+        }
+
         // DEBUG: Show alert if we received ANY share data
         if urlCount > 0 || activityCount > 0 {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {

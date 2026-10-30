@@ -6,8 +6,6 @@ struct RecordEditorView: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var record: MedicalRecord
 
-    @AppStorage("recordViewerStyle") private var viewerStyle: String = "cards"
-
     @State private var isEditing: Bool
     @State private var saveErrorMessage: String?
     @State private var showCloudSettings: Bool = false
@@ -31,17 +29,11 @@ struct RecordEditorView: View {
     }
 
     var body: some View {
-        Group {
-            if viewerStyle == "cards" && !isEditing {
-                cardViewer
+        Form {
+            if isEditing {
+                editorForm.disabled(isSharedReadOnly)
             } else {
-                Form {
-                    if isEditing {
-                        editorForm.disabled(isSharedReadOnly)
-                    } else {
-                        viewerFormList
-                    }
-                }
+                viewerFormList
             }
         }
         .navigationTitle(record.displayName)
@@ -135,355 +127,117 @@ struct RecordEditorView: View {
         }
     }
 
-    // MARK: - Card viewer
+    // MARK: - Viewer (FinAI style: one collapsible line per part with a short summary)
 
-    private struct CardPage: Identifiable {
-        let id = UUID()
-        let title: String
-        let content: AnyView
+    private func dateText(_ d: Date?) -> String { d.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—" }
+
+    /// "3 entries · latest 12.03.2026" or "No entries"
+    private func entriesSummary(_ dates: [Date?]) -> String {
+        if dates.isEmpty { return "No entries" }
+        let n = "\(dates.count) entr\(dates.count == 1 ? "y" : "ies")"
+        if let last = dates.compactMap({ $0 }).max() { return "\(n) · latest \(last.formatted(date: .numeric, time: .omitted))" }
+        return n
     }
 
-    private var cardPages: [CardPage] {
-        var pages: [CardPage] = [
-            .init(title: "Personal", content: AnyView(RecordViewerSectionPersonal(record: record).padding(.top, 4))),
-            .init(title: "Emergency", content: AnyView(RecordViewerSectionEmergency(record: record).padding(.top, 4)))
-        ]
-
-        if record.isPet {
-            pages.append(.init(title: "Veterinarian", content: AnyView(RecordViewerSectionPetVet(record: record).padding(.top, 4))))
-        } else {
-            pages.append(.init(title: "Doctors", content: AnyView(RecordViewerSectionDoctors(record: record).padding(.top, 4))))
+    private func entriesFold(_ title: String, columns: [String], dates: [Date?], rows: [[String]]) -> some View {
+        Fold(title: title, summary: entriesSummary(dates)) {
+            RecordViewerSectionEntries(title: title, columns: columns, rows: rows)
         }
-
-        if record.isPet {
-            pages.append(.init(title: "Weight", content: AnyView(
-                RecordViewerSectionEntries(
-                    title: "Weight",
-                    columns: ["Date", "kg", "Comment"],
-                    rows: record.weights
-                        .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
-                        .map { entry in
-                            [
-                                entry.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
-                                String(format: "%.1f", entry.weightKg ?? 0),
-                                entry.comment
-                            ]
-                        }
-                ).padding(.top, 4)
-            )))
-        }
-
-        if !record.isPet {
-            pages.append(.init(title: "Blood", content: AnyView(
-                RecordViewerSectionEntries(
-                    title: "Blood",
-                    columns: ["Date", "Name", "Comment"],
-                    rows: record.blood
-                        .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
-                        .map { [
-                            $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
-                            $0.name,
-                            $0.comment
-                        ] }
-                ).padding(.top, 4)
-            )))
-        }
-
-        pages.append(contentsOf: [
-            .init(title: "Medications", content: AnyView(
-                RecordViewerSectionEntries(
-                    title: "Medications",
-                    columns: ["Date", "Name & Dosage", "Comment"],
-                    rows: record.drugs
-                        .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
-                        .map { [
-                            $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
-                            $0.nameAndDosage,
-                            $0.comment
-                        ] }
-                ).padding(.top, 4)
-            )),
-            .init(title: "Vaccinations", content: AnyView(
-                RecordViewerSectionEntries(
-                    title: "Vaccinations",
-                    columns: ["Date", "Name", "Place", "Comment"],
-                    rows: record.vaccinations
-                        .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
-                        .map { [
-                            $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
-                            $0.name,
-                            $0.place,
-                            $0.comment
-                        ] }
-                ).padding(.top, 4)
-            )),
-            .init(title: "Illnesses", content: AnyView(
-                RecordViewerSectionEntries(
-                    title: "Illnesses",
-                    columns: ["Name", "Date", "Comment"],
-                    rows: record.illness
-                        .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
-                        .map { [
-                            $0.name,
-                            $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
-                            $0.informationOrComment
-                        ] }
-                ).padding(.top, 4)
-            )),
-            .init(title: "Documents", content: AnyView(
-                RecordViewerSectionEntries(
-                    title: "Documents",
-                    columns: ["Name", "Date", "Note"],
-                    rows: record.medicaldocument
-                        .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
-                        .map { [
-                            $0.name,
-                            $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
-                            $0.note
-                        ] }
-                ).padding(.top, 4)
-            )),
-            .init(title: "History", content: AnyView(
-                RecordViewerSectionEntries(
-                    title: "History",
-                    columns: ["Name", "Date", "Contact", "Comment"],
-                    rows: record.medicalhistory
-                        .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
-                        .map { [
-                            $0.name,
-                            $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
-                            $0.contact,
-                            $0.informationOrComment
-                        ] }
-                ).padding(.top, 4)
-            )),
-            .init(title: "Risks", content: AnyView(
-                RecordViewerSectionEntries(
-                    title: "Risks",
-                    columns: ["Date", "Name", "Comment"],
-                    rows: record.risks
-                        .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
-                        .map { [
-                            $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
-                            $0.name,
-                            $0.descriptionOrComment
-                        ] }
-                ).padding(.top, 4)
-            ))
-        ])
-
-        if !record.isPet {
-            pages.append(.init(title: "Allergies", content: AnyView(
-                RecordViewerSectionEntries(
-                    title: "Allergies",
-                    columns: ["Date", "Name", "Comment"],
-                    rows: record.allergy
-                        .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
-                        .map { [
-                            $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
-                            $0.name,
-                            $0.comment
-                        ] }
-                ).padding(.top, 4)
-            )))
-        }
-
-        if record.isPet {
-            pages.append(.init(title: "Costs", content: AnyView(RecordViewerSectionPetYearlyCosts(record: record).padding(.top, 4))))
-        }
-
-        pages.append(.init(title: "Record Details", content: AnyView(RecordViewerSectionDetails(record: record).padding(.top, 4))))
-        return pages
     }
 
-    private var cardViewer: some View {
-        TabView {
-            ForEach(cardPages) { page in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(page.title)
-                            .font(.title3.weight(.semibold))
-                        page.content
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-        }
-        #if os(iOS) || targetEnvironment(macCatalyst)
-        .tabViewStyle(.page(indexDisplayMode: .automatic))
-        #endif
+    private func joined(_ parts: [String]) -> String {
+        parts.map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }.joined(separator: " · ")
     }
 
-    // MARK: - List viewer
+    private var personalSummary: String {
+        let born = record.personalBirthdate.map { $0.formatted(date: .abbreviated, time: .omitted) } ?? ""
+        if record.isPet { return joined([record.petBreed, born, record.ownerName]) }
+        return joined([born, record.personalHealthInsurance])
+    }
+
+    private var emergencySummary: String {
+        let contacts = record.emergencyContacts
+        if let first = contacts.first {
+            return joined([first.name, first.phone]) + (contacts.count > 1 ? " · +\(contacts.count - 1) more" : "")
+        }
+        let s = joined([record.emergencyName, record.emergencyNumber])
+        return s.isEmpty ? "None added" : s
+    }
+
+    private var doctorsSummary: String {
+        let d = record.humanDoctors
+        if d.isEmpty { return "No doctors added" }
+        return "\(d.count) doctor\(d.count == 1 ? "" : "s") · " + d.prefix(2).map { $0.name }.filter { !$0.isEmpty }.joined(separator: ", ")
+    }
+
+    private var costsSummary: String {
+        let year = Calendar.current.component(.year, from: Date())
+        let total = record.petYearlyCosts.filter { $0.year == year }.reduce(0) { $0 + $1.amount }
+        return "\(year): " + total.formatted(.currency(code: Locale.current.currency?.identifier ?? "USD"))
+    }
 
     @ViewBuilder
     private var viewerFormList: some View {
-        // A) Personal
-        Section { RecordViewerSectionPersonal(record: record) }
-
-        // B) Emergency
-        Section { RecordViewerSectionEmergency(record: record) }
-
-        // C) Vet / Doctor
-        if record.isPet {
-            Section { RecordViewerSectionPetVet(record: record) }
-        } else {
-            Section { RecordViewerSectionDoctors(record: record) }
-        }
-
-        // D) Weight for Pets only
-        if record.isPet {
-            Section {
-                RecordViewerSectionEntries(
-                    title: "Weight",
-                    columns: ["Date", "kg", "Comment"],
-                    rows: record.weights
-                        .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
-                        .map { entry in
-                            [
-                                entry.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
-                                String(format: "%.1f", entry.weightKg ?? 0),
-                                entry.comment
-                            ]
-                        }
-                )
+        Section {
+            Fold(title: "Personal", summary: personalSummary, open: true) { RecordViewerSectionPersonal(record: record) }
+            Fold(title: "Emergency", summary: emergencySummary, open: true) { RecordViewerSectionEmergency(record: record) }
+            if record.isPet {
+                Fold(title: "Veterinarian", summary: record.vetClinicName.isEmpty ? "None added" : record.vetClinicName) { RecordViewerSectionPetVet(record: record) }
+            } else {
+                Fold(title: "Doctors", summary: doctorsSummary) { RecordViewerSectionDoctors(record: record) }
             }
         }
 
-        // E) Blood - not for pets
-        if !record.isPet {
         Section {
-            RecordViewerSectionEntries(
-                title: "Blood",
-                columns: ["Date", "Name", "Comment"],
-                rows: record.blood
-                    .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
-                    .map { [
-                        $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
-                        $0.name,
-                        $0.comment
-                    ] }
-            )
-        }
+            if record.isPet {
+                let w = record.weights.sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+                entriesFold("Weight", columns: ["Date", "kg", "Comment"], dates: w.map(\.date),
+                            rows: w.map { [dateText($0.date), String(format: "%.1f", $0.weightKg ?? 0), $0.comment] })
+            } else {
+                let b = record.blood.sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+                entriesFold("Blood", columns: ["Date", "Name", "Comment"], dates: b.map(\.date),
+                            rows: b.map { [dateText($0.date), $0.name, $0.comment] })
+            }
+
+            let m = record.drugs.sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+            entriesFold("Medications", columns: ["Date", "Name & Dosage", "Comment"], dates: m.map(\.date),
+                        rows: m.map { [dateText($0.date), $0.nameAndDosage, $0.comment] })
+
+            let v = record.vaccinations.sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+            entriesFold("Vaccinations", columns: ["Date", "Name", "Place", "Comment"], dates: v.map(\.date),
+                        rows: v.map { [dateText($0.date), $0.name, $0.place, $0.comment] })
+
+            if !record.isPet {
+                let a = record.allergy.sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+                entriesFold("Allergies", columns: ["Date", "Name", "Comment"], dates: a.map(\.date),
+                            rows: a.map { [dateText($0.date), $0.name, $0.comment] })
+            }
+
+            let i = record.illness.sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+            entriesFold("Illnesses", columns: ["Name", "Date", "Comment"], dates: i.map(\.date),
+                        rows: i.map { [$0.name, dateText($0.date), $0.informationOrComment] })
+
+            let d = record.medicaldocument.sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+            entriesFold("Documents", columns: ["Name", "Date", "Note"], dates: d.map(\.date),
+                        rows: d.map { [$0.name, dateText($0.date), $0.note] })
+
+            let h = record.medicalhistory.sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+            entriesFold("History", columns: ["Name", "Date", "Contact", "Comment"], dates: h.map(\.date),
+                        rows: h.map { [$0.name, dateText($0.date), $0.contact, $0.informationOrComment] })
+
+            let r = record.risks.sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+            entriesFold("Risks", columns: ["Date", "Name", "Comment"], dates: r.map(\.date),
+                        rows: r.map { [dateText($0.date), $0.name, $0.descriptionOrComment] })
         }
 
-        // F) Medications
         Section {
-            RecordViewerSectionEntries(
-                title: "Medications",
-                columns: ["Date", "Name & Dosage", "Comment"],
-                rows: record.drugs
-                    .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
-                    .map { [
-                        $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
-                        $0.nameAndDosage,
-                        $0.comment
-                    ] }
-            )
+            if record.isPet {
+                Fold(title: "Costs", summary: costsSummary) { RecordViewerSectionPetYearlyCosts(record: record) }
+            }
+            Fold(title: "Record details", summary: joined([record.locationStatus.accessibilityLabel, "updated " + record.updatedAt.formatted(date: .abbreviated, time: .omitted)])) {
+                RecordViewerSectionDetails(record: record)
+            }
         }
-
-        // G) Vaccinations
-        Section {
-            RecordViewerSectionEntries(
-                title: "Vaccinations",
-                columns: ["Date", "Name", "Place", "Comment"],
-                rows: record.vaccinations
-                    .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
-                    .map { [
-                        $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
-                        $0.name,
-                        $0.place,
-                        $0.comment
-                    ] }
-            )
-        }
-
-        // H) Allergies - not for pets
-        if !record.isPet {
-        Section {
-            RecordViewerSectionEntries(
-                title: "Allergies",
-                columns: ["Date", "Name", "Comment"],
-                rows: record.allergy
-                    .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
-                    .map { [
-                        $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
-                        $0.name,
-                        $0.comment
-                    ] }
-            )
-        }
-        }
-
-        // I) Illnesses
-        Section {
-            RecordViewerSectionEntries(
-                title: "Illnesses",
-                columns: ["Name", "Date", "Comment"],
-                rows: record.illness
-                    .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
-                    .map { [
-                        $0.name,
-                        $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
-                        $0.informationOrComment
-                    ] }
-            )
-        }
-
-        // J) Documents
-        Section {
-            RecordViewerSectionEntries(
-                title: "Documents",
-                columns: ["Name", "Date", "Note"],
-                rows: record.medicaldocument
-                    .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
-                    .map { [
-                        $0.name,
-                        $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
-                        $0.note
-                    ] }
-            )
-        }
-
-        // K) History
-        Section {
-            RecordViewerSectionEntries(
-                title: "History",
-                columns: ["Name", "Date", "Contact", "Comment"],
-                rows: record.medicalhistory
-                    .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
-                    .map { [
-                        $0.name,
-                        $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
-                        $0.contact,
-                        $0.informationOrComment
-                    ] }
-            )
-        }
-
-        // L) Risks
-        Section {
-            RecordViewerSectionEntries(
-                title: "Risks",
-                columns: ["Date", "Name", "Comment"],
-                rows: record.risks
-                    .sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
-                    .map { [
-                        $0.date.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—",
-                        $0.name,
-                        $0.descriptionOrComment
-                    ] }
-            )
-        }
-
-        // M) Costs for pet only
-        if record.isPet {
-            Section { RecordViewerSectionPetYearlyCosts(record: record) }
-        }
-
-        // N) Record details
-        Section { RecordViewerSectionDetails(record: record) }
     }
 
     // MARK: - Editor

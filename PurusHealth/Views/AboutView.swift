@@ -63,7 +63,8 @@ struct AboutView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        // shown inside Settings (pushed), so no own NavigationStack
+        Group {
             VStack(spacing: 12) {
                 Text("Purus Health")
                     .font(.title)

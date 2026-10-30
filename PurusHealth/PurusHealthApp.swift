@@ -98,6 +98,9 @@ struct PurusHealthApp: App {
                     await ensureSharedDBSubscription()
                 }
                 .onChange(of: scenePhase) { oldPhase, newPhase in
+                    // Face ID: locked whenever the app goes to the background, asked again when it is back in front
+                    if newPhase == .background { AppLock.shared.lock() }
+                    if newPhase == .active { AppLock.shared.appBecameActive() }
                     // Sync when app becomes active to get latest changes
                     if newPhase == .active {
                         Task { @MainActor in
