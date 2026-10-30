@@ -14,7 +14,9 @@ struct PurusHealthApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     #endif
 
-    private let modelContainer: ModelContainer
+    /// nil when the store could not be opened: then only an error screen is shown and nothing syncs.
+    private let modelContainer: ModelContainer?
+    private let storeError: String?
     @Environment(\.scenePhase) private var scenePhase: ScenePhase
 
     // Keep a single fetcher instance alive for the app lifetime.
@@ -46,94 +48,105 @@ struct PurusHealthApp: App {
         self.cloudFetcher = CloudKitMedicalRecordFetcher(containerIdentifier: AppConfig.CloudKit.containerID)
 
         do {
-            self.modelContainer = try ModelContainer(for: schema, configurations: [localConfig])
+            let container = try ModelContainer(for: schema, configurations: [localConfig])
+            self.modelContainer = container
+            self.storeError = nil
+            // Ensure the fetcher has the model context so imports can run
+            self.cloudFetcher.setModelContext(container.mainContext)
+            // Home server sync (optional mode)
+            HomeServerSyncService.shared.configure(container: container)
         } catch {
-            // Failed to create persistent ModelContainer — falling back to in-memory container for safety in older/unsupported environments.
-            let memoryConfig = ModelConfiguration(
-                schema: schema,
-                isStoredInMemoryOnly: true,
-                cloudKitDatabase: .none
-            )
-            self.modelContainer = try! ModelContainer(for: schema, configurations: [memoryConfig])
+            // No in-memory fallback: an empty store would make the next sync delete the server data and the emergency copy.
+            self.modelContainer = nil
+            self.storeError = error.localizedDescription
         }
-
-        // Ensure the fetcher has the model context so imports can run
-        self.cloudFetcher.setModelContext(self.modelContainer.mainContext)
-
-        // Home server sync (optional mode)
-        HomeServerSyncService.shared.configure(container: self.modelContainer)
     }
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
-                .environment(\.modelContext, modelContainer.mainContext)
-                .task {
-                    // Home server mode: the home server is the main copy, iCloud sync is paused.
-                    if HomeServerSettings.isEnabled {
-                        await HomeServerSyncService.shared.sync()
-                        return
-                    }
+            if let modelContainer {
+                ContentView()
+                    .environment(\.modelContext, modelContainer.mainContext)
+                    .task {
+                        // Home server mode: the home server is the main copy, iCloud sync is paused.
+                        if HomeServerSettings.isEnabled {
+                            await HomeServerSyncService.shared.sync()
+                            return
+                        }
 
-                    // Only trigger cloud fetch if user has enabled cloud sync or has cloud-enabled records.
-                    // This prevents re-importing records that were deleted locally when cloud sync is off.
-                    if await shouldFetchFromCloud() {
-                        cloudFetcher.fetchChanges()
-                    }
+                        // Only trigger cloud fetch if user has enabled cloud sync or has cloud-enabled records.
+                        // This prevents re-importing records that were deleted locally when cloud sync is off.
+                        if await shouldFetchFromCloud() {
+                            cloudFetcher.fetchChanges()
+                        }
 
-                    // Only fetch shared records if there are existing shared records locally.
-                    // New shares are handled by the share acceptance flow (onOpenURL).
-                    if await hasSharedRecordsLocally() {
-                        await fetchSharedRecordsOnLaunch()
-                    }
+                        // Only fetch shared records if there are existing shared records locally.
+                        // New shares are handled by the share acceptance flow (onOpenURL).
+                        if await hasSharedRecordsLocally() {
+                            await fetchSharedRecordsOnLaunch()
+                        }
 
-                    // If a share was accepted recently, force a shared fetch once on launch
-                    if UserDefaults.standard.bool(forKey: "pendingSharedImport") {
-                        await fetchSharedRecordsOnLaunch()
-                        UserDefaults.standard.set(false, forKey: "pendingSharedImport")
+                        // If a share was accepted recently, force a shared fetch once on launch
+                        if UserDefaults.standard.bool(forKey: "pendingSharedImport") {
+                            await fetchSharedRecordsOnLaunch()
+                            UserDefaults.standard.set(false, forKey: "pendingSharedImport")
+                        }
+                        
+                        // Ensure CloudKit push subscriptions exist
+                        await cloudFetcher.ensurePrivateDBSubscription()
+                        await ensureSharedDBSubscription()
                     }
-                    
-                    // Ensure CloudKit push subscriptions exist
-                    await cloudFetcher.ensurePrivateDBSubscription()
-                    await ensureSharedDBSubscription()
-                }
-                .onChange(of: scenePhase) { oldPhase, newPhase in
-                    // Face ID: locked whenever the app goes to the background, asked again when it is back in front
-                    if newPhase == .background { AppLock.shared.lock() }
-                    if newPhase == .active { AppLock.shared.appBecameActive() }
-                    // Sync when app becomes active to get latest changes
-                    if newPhase == .active {
+                    .onReceive(NotificationCenter.default.publisher(for: HomeServerSyncService.didDisable)) { _ in
+                        // home server off: its records were removed, load the iCloud records (and accepted shares) again
                         Task { @MainActor in
-                            if HomeServerSettings.isEnabled {
-                                await HomeServerSyncService.shared.sync()
-                                return
+                            do { _ = try await cloudFetcher.fetchAllAsync() } catch {
+                                ShareDebugStore.shared.appendLog("PurusHealthApp: iCloud fetch after home server off failed: \(error)")
                             }
-
-                            // Only sync if user has cloud-enabled records
-                            if await shouldFetchFromCloud() {
-                                cloudFetcher.fetchChanges()
-                                await syncCloudEnabledRecords()
-                            }
-
-                            // Only fetch shared records if there are existing shared records locally
-                            if await hasSharedRecordsLocally() {
-                                await fetchSharedRecordsOnLaunch()
-                            }
-
-                            // If a share was accepted while app was backgrounded, fetch now
-                            if UserDefaults.standard.bool(forKey: "pendingSharedImport") {
-                                await fetchSharedRecordsOnLaunch()
-                                UserDefaults.standard.set(false, forKey: "pendingSharedImport")
-                            }
-
-                            // Ensure CloudKit push subscriptions exist
-                            await cloudFetcher.ensurePrivateDBSubscription()
-                            await ensureSharedDBSubscription()
+                            await fetchSharedRecordsOnLaunch()
                         }
                     }
-                }
+                    .onChange(of: scenePhase) { oldPhase, newPhase in
+                        // Face ID: locked whenever the app goes to the background, asked again when it is back in front
+                        if newPhase == .background { AppLock.shared.lock() }
+                        // app switcher / Control Center: hide the records without locking
+                        if newPhase == .inactive { AppLock.shared.cover() }
+                        if newPhase == .active { AppLock.shared.appBecameActive() }
+                        // Sync when app becomes active to get latest changes
+                        if newPhase == .active {
+                            Task { @MainActor in
+                                if HomeServerSettings.isEnabled {
+                                    await HomeServerSyncService.shared.sync()
+                                    return
+                                }
+
+                                // Only sync if user has cloud-enabled records
+                                if await shouldFetchFromCloud() {
+                                    cloudFetcher.fetchChanges()
+                                    await syncCloudEnabledRecords()
+                                }
+
+                                // Only fetch shared records if there are existing shared records locally
+                                if await hasSharedRecordsLocally() {
+                                    await fetchSharedRecordsOnLaunch()
+                                }
+
+                                // If a share was accepted while app was backgrounded, fetch now
+                                if UserDefaults.standard.bool(forKey: "pendingSharedImport") {
+                                    await fetchSharedRecordsOnLaunch()
+                                    UserDefaults.standard.set(false, forKey: "pendingSharedImport")
+                                }
+
+                                // Ensure CloudKit push subscriptions exist
+                                await cloudFetcher.ensurePrivateDBSubscription()
+                                await ensureSharedDBSubscription()
+                            }
+                        }
+                    }
+                    .modelContainer(modelContainer)
+            } else {
+                StoreErrorView(message: storeError ?? "")
+            }
         }
-        .modelContainer(modelContainer)
     }
     
     /// Returns true if cloud sync should be performed.
@@ -144,7 +157,7 @@ struct PurusHealthApp: App {
         if globalCloudEnabled { return true }
 
         // Check if any local records are cloud-enabled
-        let context = modelContainer.mainContext
+        guard let context = modelContainer?.mainContext else { return false }
         let fetchDescriptor = FetchDescriptor<MedicalRecord>(predicate: #Predicate { $0.isCloudEnabled == true })
         let count = (try? context.fetchCount(fetchDescriptor)) ?? 0
         return count > 0
@@ -153,7 +166,7 @@ struct PurusHealthApp: App {
     /// Returns true if there are shared records locally that need to be updated.
     @MainActor
     private func hasSharedRecordsLocally() async -> Bool {
-        let context = modelContainer.mainContext
+        guard let context = modelContainer?.mainContext else { return false }
         let fetchDescriptor = FetchDescriptor<MedicalRecord>(predicate: #Predicate { $0.isSharingEnabled == true })
         let count = (try? context.fetchCount(fetchDescriptor)) ?? 0
         return count > 0
@@ -161,7 +174,7 @@ struct PurusHealthApp: App {
 
     @MainActor
     private func syncCloudEnabledRecords() async {
-        let context = modelContainer.mainContext
+        guard let context = modelContainer?.mainContext else { return }
         let fetchDescriptor = FetchDescriptor<MedicalRecord>(predicate: #Predicate { $0.isCloudEnabled == true })
         
         guard let records = try? context.fetch(fetchDescriptor) else { return }
@@ -178,6 +191,7 @@ struct PurusHealthApp: App {
     
     @MainActor
     private func fetchSharedRecordsOnLaunch() async {
+        guard let modelContainer else { return }
         do {
             let sharedFetcher = CloudKitSharedZoneMedicalRecordFetcher(
                 containerIdentifier: AppConfig.CloudKit.containerID,
@@ -193,5 +207,26 @@ struct PurusHealthApp: App {
     @MainActor
     private func ensureSharedDBSubscription() async {
         await PurusHealth.ensureSharedDBSubscription(containerIdentifier: AppConfig.CloudKit.containerID)
+    }
+}
+
+/// Shown instead of the app when the data store cannot be opened (nothing is synced or overwritten in this state).
+private struct StoreErrorView: View {
+    let message: String
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.largeTitle)
+                .foregroundStyle(.orange)
+                .accessibilityHidden(true)
+            Text("Purus Health cannot open its data")
+                .font(.headline)
+            Text("Nothing was changed or synced. Restart the app; if this stays, contact support.\n\n\(message)")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(24)
     }
 }

@@ -23,7 +23,8 @@ struct RecordListView: View {
     }
 
     @State private var activeRecord: MedicalRecord? = nil
-    @State private var showEditor: Bool = false
+    /// Record just created with "+" and its creation stamp; removed again if closed unchanged.
+    @State private var newRecord: (uuid: String, stamp: Date)? = nil
     @State private var startEditing: Bool = false
     @State private var showSettings: Bool = false
     @State private var saveErrorMessage: String?
@@ -50,10 +51,12 @@ struct RecordListView: View {
         }
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { screenWidth = $0 }
         .task {
+            // iCloud is paused in home server mode.
+            guard !HomeServerSettings.isEnabled else { return }
             await CloudKitMedicalRecordFetcher(containerIdentifier: AppConfig.CloudKit.containerID).ensurePrivateDBSubscription()
             await ensureSharedDBSubscription(containerIdentifier: AppConfig.CloudKit.containerID)
         }
-        .sheet(item: $activeRecord, onDismiss: { activeRecord = nil; startEditing = false }) { record in
+        .sheet(item: $activeRecord, onDismiss: { activeRecord = nil; startEditing = false; discardUntouchedNewRecord() }) { record in
             NavigationStack {
                 RecordEditorView(record: record, startEditing: startEditing)
             }
@@ -96,7 +99,7 @@ struct RecordListView: View {
                 ContentUnavailableView("Select a record", systemImage: "person.text.rectangle")
             }
         case .settings:
-            SettingsView(showsClose: false)
+            SettingsView()
         case nil:
             ContentUnavailableView("Select a record", systemImage: "person.text.rectangle")
         }
@@ -113,7 +116,6 @@ struct RecordListView: View {
             }
             .navigationTitle("Purus Health")
             .toolbar {
-                #if os(iOS) || targetEnvironment(macCatalyst)
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
                         if isWide { detail = .settings } else { showSettings = true }
@@ -139,34 +141,6 @@ struct RecordListView: View {
                         Image(systemName: "plus")
                     }
                 }
-                #else
-                // macOS: use automatic placements so toolbar items render in the mac toolbar
-                ToolbarItem(placement: .automatic) {
-                    Button {
-                        showSettings = true
-                    } label: {
-                        Image(systemName: "gearshape")
-                    }
-                }
-
-                ToolbarItem {
-                    Menu {
-                        Button {
-                            addRecord(isPet: false)
-                        } label: {
-                            Label("Human", systemImage: "person")
-                        }
-
-                        Button {
-                            addRecord(isPet: true)
-                        } label: {
-                            Label("Pet", systemImage: "cat")
-                        }
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                }
-                #endif
             }
     }
 
@@ -195,7 +169,19 @@ struct RecordListView: View {
         }
         // Ensure the `startEditing` state is set before presenting the sheet so the editor opens in edit mode.
         startEditing = true
+        newRecord = (record.uuid, record.updatedAt)
         activeRecord = record
+    }
+
+    /// Every edit bumps updatedAt (touchAndSave), so an unchanged stamp means nothing was entered.
+    private func discardUntouchedNewRecord() {
+        defer { newRecord = nil }
+        guard let new = newRecord,
+              let record = allRecords.first(where: { $0.uuid == new.uuid }),
+              record.updatedAt == new.stamp else { return }
+        modelContext.delete(record)
+        do { try modelContext.save() }
+        catch { saveErrorMessage = "Delete failed: \(error.localizedDescription)" }
     }
 
     private func deleteRecords(at offsets: IndexSet) {

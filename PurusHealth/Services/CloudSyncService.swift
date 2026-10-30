@@ -114,6 +114,8 @@ final class CloudSyncService {
     func syncIfNeeded(record: MedicalRecord) async throws {
         // Home server mode: iCloud sync is paused
         if HomeServerSettings.isEnabled { return }
+        // Global "Enable iCloud Sync" switch off stops all uploads.
+        guard UserDefaults.standard.bool(forKey: "cloudEnabled") else { return }
         guard record.isCloudEnabled else { return }
 
         // Do not resurrect locally deleted records
@@ -134,15 +136,21 @@ final class CloudSyncService {
 
         try await ensureShareZoneExists()
 
-        // If this record is part of a CloudKit share, attempt to write back to the shared database
-        // so receivers with write permission can sync their edits back to the owner and other participants.
-        if record.isSharingEnabled, let _ = record.cloudShareRecordName {
+        try await migrateRootRecordToShareZoneIfNeeded(record: record)
+
+        let ckID = zonedRecordID(for: record)
+
+        // Owner: the root lives in our private zone. Only when it is missing and a share name is known
+        // is this a received record, which is written back via the shared database.
+        let ckRecord: CKRecord
+        do {
+            ckRecord = try await database.record(for: ckID)
+        } catch let ck as CKError where ck.code == .unknownItem && record.cloudShareRecordName != nil {
             do {
                 try await syncSharedRecordIfNeeded(record)
                 return
             } catch {
                 // If the user has read-only permission, CloudKit will return a permission failure.
-                // In that case, surface a friendly error and fall through to private DB sync only if this device is the owner.
                 if let ck = error as? CKError, ck.code == .permissionFailure {
                     ShareDebugStore.shared.appendLog("syncIfNeeded: shared write denied (read-only participant) for record=\(record.uuid)")
                     throw NSError(domain: "CloudSyncService", code: 8, userInfo: [NSLocalizedDescriptionKey: "You don't have permission to edit this shared record."])
@@ -151,17 +159,13 @@ final class CloudSyncService {
                     throw error
                 }
             }
-        }
-
-        try await migrateRootRecordToShareZoneIfNeeded(record: record)
-
-        let ckID = zonedRecordID(for: record)
-
-        let ckRecord: CKRecord
-        do {
-            ckRecord = try await database.record(for: ckID)
         } catch {
             ckRecord = CKRecord(recordType: medicalRecordType, recordID: ckID)
+        }
+
+        if serverIsCurrent(ckRecord, comparedTo: record) {
+            record.cloudRecordName = ckRecord.recordID.recordName
+            return
         }
 
         applyMedicalRecord(record, to: ckRecord)
@@ -222,6 +226,8 @@ final class CloudSyncService {
             return
         }
 
+        if serverIsCurrent(sharedCKRecord, comparedTo: record) { return }
+
         // Apply local changes and save to the shared database
         applyMedicalRecord(record, to: sharedCKRecord)
         do {
@@ -239,6 +245,14 @@ final class CloudSyncService {
         }
     }
 
+    /// True when the server copy is at least as new as the local one and is not a tombstone,
+    /// so an upload would only overwrite newer data (e.g. foreground push before fetch).
+    private func serverIsCurrent(_ server: CKRecord, comparedTo record: MedicalRecord) -> Bool {
+        guard let serverUpdatedAt = server["updatedAt"] as? Date else { return false }
+        if let deleted = server["isDeleted"] as? NSNumber, deleted.boolValue { return false }
+        return serverUpdatedAt >= record.updatedAt
+    }
+
     func disableCloud(for record: MedicalRecord) {
         // Turn off local flags immediately.
         record.isCloudEnabled = false
@@ -247,6 +261,12 @@ final class CloudSyncService {
         // Create tombstone in CloudKit to remove from all other synced devices.
         // This makes "Set Local" behave like "Stop Sharing" - removes from all devices except this one.
         Task {
+            // Remove the share first so receivers lose access; the tombstone alone would leave it active.
+            do {
+                try await stopSharing(for: record)
+            } catch {
+                ShareDebugStore.shared.appendLog("disableCloud: stopping share failed uuid=\(record.uuid) error=\(error)")
+            }
             do {
                 try await createTombstone(for: record)
                 ShareDebugStore.shared.appendLog("disableCloud: created tombstone to remove from other devices uuid=\(record.uuid)")
@@ -261,39 +281,6 @@ final class CloudSyncService {
 
             // Bump updatedAt so UI ordering reflects the change.
             record.updatedAt = Date()
-        }
-    }
-
-    private func revokeSharingAndDeleteFromCloud(record: MedicalRecord) async throws {
-        try await ensureShareZoneExists()
-
-        // 1) Delete existing share record (if we know it)
-        if let shareRecordName = record.cloudShareRecordName {
-            let shareID = CKRecord.ID(recordName: shareRecordName, zoneID: shareZoneID)
-            do {
-                _ = try await database.deleteRecord(withID: shareID)
-                ShareDebugStore.shared.appendLog("revokeSharingAndDeleteFromCloud: deleted CKShare id=\(shareRecordName) zone=\(shareZoneName) for record=\(record.uuid)")
-            } catch {
-                if let ck = error as? CKError, ck.code == .unknownItem {
-                    ShareDebugStore.shared.appendLog("revokeSharingAndDeleteFromCloud: share already missing id=\(shareRecordName)")
-                } else {
-                    throw error
-                }
-            }
-            record.cloudShareRecordName = nil
-        }
-
-        // 2) Delete root record from share zone
-        let rootID = zonedRecordID(for: record)
-        do {
-            _ = try await database.deleteRecord(withID: rootID)
-            ShareDebugStore.shared.appendLog("revokeSharingAndDeleteFromCloud: deleted root record id=\(rootID.recordName) zone=\(shareZoneName) for record=\(record.uuid)")
-        } catch {
-            if let ck = error as? CKError, ck.code == .unknownItem {
-                ShareDebugStore.shared.appendLog("revokeSharingAndDeleteFromCloud: root record already missing id=\(rootID.recordName)")
-            } else {
-                throw error
-            }
         }
     }
 
@@ -336,7 +323,6 @@ final class CloudSyncService {
             do {
                 let existingRecord = try await database.record(for: shareID)
                 if let existing = existingRecord as? CKShare {
-                    ShareDebugStore.shared.lastShareURL = existing.url
                     ShareDebugStore.shared.appendLog("createShare: reusing existing share id=\(existing.recordID.recordName) zone=\(shareZoneName) url=\(String(describing: existing.url))")
                     return existing
                 }
@@ -357,7 +343,6 @@ final class CloudSyncService {
                 let existingShareRecord = try await database.record(for: existingShareRef.recordID)
                 if let existingShare = existingShareRecord as? CKShare {
                     record.cloudShareRecordName = existingShare.recordID.recordName
-                    ShareDebugStore.shared.lastShareURL = existingShare.url
                     ShareDebugStore.shared.appendLog("createShare: found existing share via root reference id=\(existingShare.recordID.recordName) url=\(String(describing: existingShare.url))")
                     return existingShare
                 }
@@ -371,7 +356,7 @@ final class CloudSyncService {
         let share = CKShare(rootRecord: root)
         // Configure default permissions; only invited users, allow read-write by default via UI controller
         share.publicPermission = .none
-        share[CKShare.SystemFieldKey.title] = (root["personalName"] as? NSString) ?? "Shared Medical Record"
+        share[CKShare.SystemFieldKey.title] = record.displayName as NSString
 
         do {
             // Use CKModifyRecordsOperation with .allKeys save policy
@@ -451,7 +436,6 @@ final class CloudSyncService {
             
             // Store the share record name and URL
             record.cloudShareRecordName = finalShare.recordID.recordName
-            ShareDebugStore.shared.lastShareURL = finalShare.url
             
             // If URL is nil, retry fetching to get the server-populated URL
             // The URL is generated asynchronously by CloudKit servers and might not be available immediately
@@ -474,7 +458,6 @@ final class CloudSyncService {
                             
                             if fetchedShare.url != nil {
                                 refetchedShare = fetchedShare
-                                ShareDebugStore.shared.lastShareURL = fetchedShare.url
                                 ShareDebugStore.shared.appendLog("createShare: SUCCESS - share URL populated after \(retryCount + 1) retries")
                                 break
                             } else {
@@ -491,20 +474,7 @@ final class CloudSyncService {
                     currentDelay *= 2  // Exponential backoff
                 }
                 
-                // If we got a refetched share with URL, verify root has share reference and return it
                 if let refetchedShare = refetchedShare, refetchedShare.url != nil {
-                    // Verify the root record has the share reference
-                    do {
-                        let refetchedRoot = try await database.record(for: root.recordID)
-                        if let shareRef = refetchedRoot.share {
-                            ShareDebugStore.shared.appendLog("createShare: root record has share reference=\(shareRef.recordID.recordName)")
-                        } else {
-                            ShareDebugStore.shared.appendLog("createShare: WARNING - root record does not have share reference")
-                        }
-                    } catch {
-                        ShareDebugStore.shared.appendLog("createShare: WARNING - failed to refetch root record: \(error)")
-                    }
-                    
                     return refetchedShare
                 } else {
                     ShareDebugStore.shared.appendLog("createShare: WARNING - share URL still nil after all retries. This may indicate a CloudKit configuration issue or simulator limitation.")
@@ -516,11 +486,9 @@ final class CloudSyncService {
             
         } catch let error as NSError where error.domain == "CloudSyncService" {
             // Re-throw our custom errors as-is
-            ShareDebugStore.shared.lastError = error
             ShareDebugStore.shared.appendLog("createShare: failed with custom error: \(error)")
             throw error
         } catch {
-            ShareDebugStore.shared.lastError = error
             ShareDebugStore.shared.appendLog("createShare: failed: \(error)")
             throw enrichCloudKitError(error)
         }
@@ -530,7 +498,6 @@ final class CloudSyncService {
 
 #if os(iOS) || targetEnvironment(macCatalyst)
     private var activeSharingDelegate: CloudSharingDelegate? // retain delegate while sheet is presented
-    private var sharingTimeoutTask: Task<Void, Never>? = nil
 
     func makeCloudSharingController(for record: MedicalRecord, preferredPermissions: UICloudSharingController.PermissionOptions? = nil, onComplete: @escaping (Result<URL?, Error>) -> Void) async throws -> UICloudSharingController {
         let container = CKContainer(identifier: containerIdentifier)
@@ -562,10 +529,14 @@ final class CloudSyncService {
         // Create delegate and retain it while controller is presented
         let delegate = CloudSharingDelegate()
         self.activeSharingDelegate = delegate
+        weak var weakController: CleanupCloudSharingController?
         delegate.onComplete = { [weak self] result in
+            // Saved or stopped: the share is settled, no cleanup on dismiss.
+            if case .success = result { weakController?.onDismissWithoutSave = nil }
             onComplete(result)
             DispatchQueue.main.async { self?.activeSharingDelegate = nil }
         }
+        let hadShare = record.cloudShareRecordName != nil
 
         let savedShare: CKShare
         do {
@@ -576,8 +547,15 @@ final class CloudSyncService {
             throw enrichCloudKitError(error)
         }
 
-        let controller = UICloudSharingController(share: savedShare, container: container)
+        let controller = CleanupCloudSharingController(share: savedShare, container: container)
         controller.delegate = delegate
+        weakController = controller
+        // A share created just for this sheet must not stay in CloudKit when the sheet is cancelled or fails.
+        if !hadShare {
+            controller.onDismissWithoutSave = { [weak self] in
+                Task { @MainActor in try? await self?.stopSharing(for: record) }
+            }
+        }
         if let preferred = preferredPermissions {
             controller.availablePermissions = [preferred, .allowPrivate]
         } else {
@@ -609,27 +587,24 @@ final class CloudSyncService {
             ckRecord = try await database.record(for: ckID)
         } catch {
             if let ck = error as? CKError, ck.code == .unknownItem {
-                // Record doesn't exist in CloudKit yet; create a new tombstone record.
-                ckRecord = CKRecord(recordType: medicalRecordType, recordID: ckID)
+                // Nothing in our zone to delete (never uploaded, or a received record): no tombstone needed.
+                ShareDebugStore.shared.appendLog("[CloudSyncService] No zone record, skipping tombstone uuid=\(record.uuid)")
+                return
             } else {
                 throw error
             }
         }
 
-        // Minimal data - only deletion metadata, no personal/medical information
+        // Minimal data - clear every other field so deleted medical data does not stay readable in iCloud
+        for key in ckRecord.allKeys() where !["uuid", "isDeleted", "updatedAt"].contains(key) {
+            ckRecord[key] = nil
+        }
         ckRecord["uuid"] = record.uuid as NSString
         ckRecord["isDeleted"] = 1 as NSNumber
-        ckRecord["deletedAt"] = Date() as NSDate
         ckRecord["updatedAt"] = Date() as NSDate
-        ckRecord["schemaVersion"] = 1 as NSNumber
 
         _ = try await database.save(ckRecord)
         ShareDebugStore.shared.appendLog("[CloudSyncService] Created tombstone uuid=\(record.uuid)")
-    }
-
-    // Convenience compatibility wrapper for earlier API name
-    func deleteCloudRecord(for record: MedicalRecord) async throws {
-        try await deleteSyncRecord(forLocalRecord: record)
     }
 
     func deleteSyncRecord(forLocalRecord record: MedicalRecord) async throws {
@@ -666,7 +641,7 @@ final class CloudSyncService {
 
     // MARK: - Mapping
     
-    private func applyMedicalRecord(_ record: MedicalRecord, to ckRecord: CKRecord) {
+    func applyMedicalRecord(_ record: MedicalRecord, to ckRecord: CKRecord) {
         ckRecord["uuid"] = record.uuid as NSString
         ckRecord["createdAt"] = record.createdAt as NSDate
         ckRecord["updatedAt"] = record.updatedAt as NSDate
@@ -785,8 +760,8 @@ final class CloudSyncService {
         // Simple versioning to allow future schema changes
         ckRecord["schemaVersion"] = 1 as NSNumber
 
-        // Tombstone/flags are tracked locally; avoid mirroring to CloudKit to prevent schema drift
-        // Intentionally not writing isDeleted / isSharingEnabled fields to CloudKit
+        // Live record: clears a tombstone left by "Set Local", else re-enabling sync deletes it everywhere
+        ckRecord["isDeleted"] = 0 as NSNumber
     }
 
     private func enrichCloudKitError(_ error: Error) -> Error {
@@ -810,6 +785,18 @@ final class CloudSyncService {
 }
 
 #if os(iOS) || targetEnvironment(macCatalyst)
+/// UICloudSharingController has no cancel callback; detect dismissal to clean up an unsaved share.
+final class CleanupCloudSharingController: UICloudSharingController {
+    var onDismissWithoutSave: (() -> Void)?
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        guard isBeingDismissed || presentingViewController == nil else { return }
+        onDismissWithoutSave?()
+        onDismissWithoutSave = nil
+    }
+}
+
 class CloudSharingDelegate: NSObject, UICloudSharingControllerDelegate {
     var onComplete: ((Result<URL?, Error>) -> Void)?
 

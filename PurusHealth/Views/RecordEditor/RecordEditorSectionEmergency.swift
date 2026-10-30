@@ -12,35 +12,13 @@ struct RecordEditorSectionEmergency: View {
             TextField("Emergency Contact Number", text: $record.emergencyNumber)
             TextField("Emergency Contact Email", text: $record.emergencyEmail)
 
-            ForEach(record.emergencyContacts.indices, id: \.self) { idx in
-                HStack {
-                    TextField("Name", text: Binding(
-                        get: { record.emergencyContacts[idx].name },
-                        set: { record.emergencyContacts[idx].name = $0 }
-                    ))
-                    Spacer()
-                    Button(role: .destructive) {
-                        let removed = record.emergencyContacts.remove(at: idx)
-                        modelContext.delete(removed)
-                        onChange()
-                    } label: {
-                        Image(systemName: "trash")
-                    }
+            // Bound to the objects (not indices) so deleting a focused row cannot index out of range.
+            ForEach(record.emergencyContacts.sortedByName, id: \.id) { contact in
+                EmergencyContactRowView(contact: contact, onChange: onChange) {
+                    record.emergencyContacts.removeAll { $0.id == contact.id }
+                    modelContext.delete(contact)
+                    onChange()
                 }
-
-                TextField("Phone", text: Binding(
-                    get: { record.emergencyContacts[idx].phone },
-                    set: { record.emergencyContacts[idx].phone = $0 }
-                ))
-                TextField("Email", text: Binding(
-                    get: { record.emergencyContacts[idx].email },
-                    set: { record.emergencyContacts[idx].email = $0 }
-                ))
-                TextField("Note", text: Binding(
-                    get: { record.emergencyContacts[idx].note },
-                    set: { record.emergencyContacts[idx].note = $0 }
-                ), axis: .vertical)
-                    .lineLimit(1...3)
             }
 
             Button("Add Emergency Contact") {
@@ -54,5 +32,39 @@ struct RecordEditorSectionEmergency: View {
         .onChange(of: record.emergencyName) { onChange() }
         .onChange(of: record.emergencyNumber) { onChange() }
         .onChange(of: record.emergencyEmail) { onChange() }
+    }
+}
+
+struct EmergencyContactRowView: View {
+    @Bindable var contact: EmergencyContact
+    let onChange: () -> Void
+    let onDelete: () -> Void
+
+    var body: some View {
+        HStack {
+            TextField("Name", text: $contact.name)
+            Spacer()
+            Button(role: .destructive, action: onDelete) {
+                Image(systemName: "trash")
+            }
+        }
+        TextField("Phone", text: $contact.phone)
+        TextField("Email", text: $contact.email)
+        TextField("Note", text: $contact.note, axis: .vertical)
+            .lineLimit(1...3)
+            .onChange(of: contact.name) { onChange() }
+            .onChange(of: contact.phone) { onChange() }
+            .onChange(of: contact.email) { onChange() }
+            .onChange(of: contact.note) { onChange() }
+    }
+}
+
+extension Array where Element == EmergencyContact {
+    /// Stable display order (no order field in the model).
+    var sortedByName: [EmergencyContact] {
+        sorted {
+            let c = $0.name.localizedCaseInsensitiveCompare($1.name)
+            return c == .orderedSame ? $0.id.uuidString < $1.id.uuidString : c == .orderedAscending
+        }
     }
 }

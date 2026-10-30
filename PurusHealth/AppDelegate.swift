@@ -18,13 +18,6 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             MainActor.assumeIsolated { AppLock.shared.attach(windowScene) }
         }
 
-        // DEBUG: Show alert if we received ANY share data
-        if urlCount > 0 || activityCount > 0 {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                self.showDebugAlert("Share Data Received", message: "URLs: \(urlCount), Activities: \(activityCount)")
-            }
-        }
-
         // Check for share URL in URL contexts (cold launch via URL scheme)
         for context in connectionOptions.urlContexts {
             if HomeServerPairing.isPairingURL(context.url) {
@@ -49,7 +42,6 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         for context in URLContexts where HomeServerPairing.handle(url: context.url) { URLContexts.remove(context) }
         if URLContexts.isEmpty { return }
         ShareDebugStore.shared.appendLog("SceneDelegate: openURLContexts called, count=\(URLContexts.count)")
-        showDebugAlert("openURLContexts", message: "Received \(URLContexts.count) URL(s)")
         for context in URLContexts {
             handleShareURL(context.url)
         }
@@ -58,19 +50,18 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     // Called when app is ALREADY RUNNING and receives a user activity (universal link, CloudKit share)
     func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
         ShareDebugStore.shared.appendLog("SceneDelegate: continue userActivity called, type=\(userActivity.activityType)")
-        showDebugAlert("continue userActivity", message: "Type: \(userActivity.activityType)")
         handleUserActivity(userActivity)
     }
 
     private func handleShareURL(_ url: URL) {
         ShareDebugStore.shared.appendLog("SceneDelegate: received URL: \(url.absoluteString)")
         PendingShareStore.shared.pendingURL = url
+        postPendingShare(["url": url])
+    }
+
+    private func postPendingShare(_ userInfo: [String: Any]) {
         DispatchQueue.main.async {
-            NotificationCenter.default.post(
-                name: NotificationNames.pendingShareReceived,
-                object: nil,
-                userInfo: ["url": url]
-            )
+            NotificationCenter.default.post(name: NotificationNames.pendingShareReceived, object: nil, userInfo: userInfo)
         }
     }
 
@@ -81,13 +72,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         if let metadata = extractCloudKitMetadata(from: userActivity) {
             ShareDebugStore.shared.appendLog("SceneDelegate: found cloudKitShareMetadata, container: \(metadata.containerIdentifier)")
             PendingShareStore.shared.pendingMetadata = metadata
-            DispatchQueue.main.async {
-                NotificationCenter.default.post(
-                    name: NotificationNames.pendingShareReceived,
-                    object: nil,
-                    userInfo: ["metadata": metadata]
-                )
-            }
+            postPendingShare(["metadata": metadata])
             return
         }
 
@@ -104,21 +89,10 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         return userActivity.value(forKey: "cloudKitShareMetadata") as? CKShare.Metadata
     }
 
-    private func showDebugAlert(_ title: String, message: String) {
-        guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-              let window = windowScene.windows.first else { return }
-
-        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default))
-        window.rootViewController?.present(alert, animated: true)
-    }
-    
     func windowScene(_ windowScene: UIWindowScene, userDidAcceptCloudKitShareWith metadata: CKShare.Metadata) {
         ShareDebugStore.shared.appendLog("SceneDelegate: userDidAcceptCloudKitShareWith (SceneDelegate) called")
         PendingShareStore.shared.pendingMetadata = metadata
-        DispatchQueue.main.async {
-            NotificationCenter.default.post(name: NotificationNames.pendingShareReceived, object: nil, userInfo: ["metadata": metadata])
-        }
+        postPendingShare(["metadata": metadata])
     }
 }
 
@@ -131,48 +105,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return config
     }
 
-    // Fallback acceptance for older code paths (pre-scene apps). Keep minimal.
-    func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
-        ShareDebugStore.shared.appendLog("AppDelegate: received userActivity type: \(userActivity.activityType)")
+    // Scene-based app: share links, user activities and accepted CloudKit shares arrive in SceneDelegate.
 
-        // Use Key-Value coding to access cloudKitShareMetadata safely
-        if let metadata = userActivity.value(forKey: "cloudKitShareMetadata") as? CKShare.Metadata {
-            ShareDebugStore.shared.appendLog("AppDelegate: found cloudKitShareMetadata")
-            PendingShareStore.shared.pendingMetadata = metadata
-            DispatchQueue.main.async {
-                NotificationCenter.default.post(
-                    name: NotificationNames.pendingShareReceived,
-                    object: nil,
-                    userInfo: ["metadata": metadata]
-                )
-            }
-            return true
-        }
-
-        if let url = userActivity.webpageURL {
-            ShareDebugStore.shared.appendLog("AppDelegate: found webpageURL: \(url.absoluteString)")
-            PendingShareStore.shared.pendingURL = url
-            DispatchQueue.main.async {
-                NotificationCenter.default.post(
-                    name: NotificationNames.pendingShareReceived,
-                    object: nil,
-                    userInfo: ["url": url]
-                )
-            }
-            return true
-        }
-
-        return false
-    }
-    
-    func application(_ application: UIApplication, userDidAcceptCloudKitShareWith metadata: CKShare.Metadata) {
-        ShareDebugStore.shared.appendLog("AppDelegate: userDidAcceptCloudKitShareWith (AppDelegate) called")
-        PendingShareStore.shared.pendingMetadata = metadata
-        DispatchQueue.main.async {
-            NotificationCenter.default.post(name: NotificationNames.pendingShareReceived, object: nil, userInfo: ["metadata": metadata])
-        }
-    }
-    
     func application(_ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable : Any], fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void) {
         ShareDebugStore.shared.appendLog("AppDelegate: didReceiveRemoteNotification")
         // Post a notification so views can refresh shared/private records

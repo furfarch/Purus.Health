@@ -10,7 +10,7 @@ struct RecordEditorSectionAllergies: View {
         if record.isPet { EmptyView() } else {
         Section("Allergies & Intolerances") {
             ForEach(record.allergy) { entry in
-                AllergyEntryRowView(entry: entry)
+                AllergyEntryRowView(entry: entry, onChange: onChange)
             }
             .onDelete(perform: deleteAllergy)
 
@@ -40,6 +40,7 @@ struct RecordEditorSectionAllergies: View {
 
 struct AllergyEntryRowView: View {
     @Bindable var entry: AllergyEntry
+    let onChange: () -> Void
 
     var body: some View {
         VStack(alignment: .leading) {
@@ -52,5 +53,9 @@ struct AllergyEntryRowView: View {
             TextField("Information", text: $entry.information)
             TextField("Comment", text: $entry.comment)
         }
+        .onChange(of: entry.date) { onChange() }
+        .onChange(of: entry.name) { onChange() }
+        .onChange(of: entry.information) { onChange() }
+        .onChange(of: entry.comment) { onChange() }
     }
 }

@@ -25,6 +25,13 @@ struct ContentView: View {
     @State private var pairingTitle: String?
     @State private var pairingMessage: String = ""
 
+    // A pairing link waits for Face ID, then the user confirms the server
+    @ObservedObject private var appLock = AppLock.shared
+    @State private var pairHost: String?
+
+    // iCloud shares are not accepted in home server mode (they would be sent to the server)
+    @State private var showShareBlockedAlert = false
+
     var body: some View {
         RecordListView()
             .onReceive(NotificationCenter.default.publisher(for: HomeServerPairing.didPair)) { notif in
@@ -42,7 +49,7 @@ struct ContentView: View {
                 Task { @MainActor in
                     do {
                         try await HomeServerSyncService.shared.enable()
-                        pairingMessage = "The home server is now the main copy. While the home server is on, the app shows only the home server data. Your iCloud data is not shown and not synced, but it is not deleted: it comes back when you turn the home server off. A backup of the previous data on this device is in the emergency copy folder."
+                        pairingMessage = "The home server is now the main copy. While the home server is on, the app shows only the home server data and iCloud sync is paused. When you turn the home server off, only records that had iCloud sync on are loaded again from iCloud. A backup of the previous data on this device is in the emergency copy folder."
                         pairingTitle = "Home server on"
                     } catch {
                         pairingMessage = "The device is paired, but switching to the home server failed: \(error.localizedDescription) Try again in Settings › Home Server."
@@ -56,9 +63,34 @@ struct ContentView: View {
             } message: {
                 Text(pairingMessage)
             }
+            .onReceive(NotificationCenter.default.publisher(for: HomeServerPairing.linkReceived)) { _ in offerPendingPairing() }
+            .onChange(of: appLock.locked) { _, _ in offerPendingPairing() }
+            .alert("Pair with \(pairHost ?? "")?",
+                   isPresented: Binding(get: { pairHost != nil }, set: { if !$0 { pairHost = nil } })) {
+                Button("Pair") {
+                    pairHost = nil
+                    // let this alert close before the result alert opens
+                    Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 500_000_000)
+                        HomeServerPairing.confirmPending()
+                    }
+                }
+                Button("Cancel", role: .cancel) {
+                    pairHost = nil
+                    HomeServerPairing.cancelPending()
+                }
+            } message: {
+                Text("This device will use this home server with the new pairing code.")
+            }
+            .alert("iCloud share not accepted", isPresented: $showShareBlockedAlert) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Turn off home server mode to accept iCloud shares.")
+            }
             .onOpenURL { url in
                 // Home server pairing link (QR code from purus.HEALTH web) - not a share
                 if HomeServerPairing.handle(url: url) { return }
+                if refuseShareInHomeServerMode() { return }
                 // Accept CloudKit share links and import shared records.
                 Task { @MainActor in
                     await CloudKitShareAcceptanceService.shared.acceptShare(from: url, modelContext: modelContext)
@@ -107,6 +139,8 @@ struct ContentView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: NotificationNames.didChangeSharedRecords)) { _ in
                 // Another component requested a UI refresh for shared records - perform a shared-zone fetch
+                // (not in home server mode: shared records would be sent to the server)
+                if HomeServerSettings.isEnabled { return }
                 Task { @MainActor in
                     let sharedFetcher = CloudKitSharedZoneMedicalRecordFetcher(containerIdentifier: AppConfig.CloudKit.containerID, modelContext: modelContext)
                     do {
@@ -143,6 +177,7 @@ struct ContentView: View {
                 // Process share immediately when received from SceneDelegate/AppDelegate
                 // This handles the case where onOpenURL doesn't fire due to custom SceneDelegate
                 guard let userInfo = notif.userInfo else { return }
+                if refuseShareInHomeServerMode() { return }
 
                 // Prefer metadata (more efficient - skips URL fetch)
                 if let metadata = userInfo["metadata"] as? CKShare.Metadata {
@@ -163,9 +198,28 @@ struct ContentView: View {
             }
     }
     
+    /// Home server mode: drop the pending share and tell the user why.
+    private func refuseShareInHomeServerMode() -> Bool {
+        guard HomeServerSettings.isEnabled else { return false }
+        #if canImport(UIKit)
+        _ = PendingShareStore.shared.consumeMetadata()
+        _ = PendingShareStore.shared.consumeURL()
+        #endif
+        showShareBlockedAlert = true
+        return true
+    }
+
+    /// Shows the pairing confirmation once the app is unlocked.
+    private func offerPendingPairing() {
+        guard !appLock.locked, pairHost == nil, let host = HomeServerPairing.pendingHost else { return }
+        pairHost = host
+    }
+
     @MainActor
     private func checkPendingShare() async {
         #if canImport(UIKit)
+        if PendingShareStore.shared.pendingMetadata != nil || PendingShareStore.shared.pendingURL != nil,
+           refuseShareInHomeServerMode() { return }
         // Check for pending share metadata first (more efficient)
         if let metadata = PendingShareStore.shared.consumeMetadata() {
             ShareDebugStore.shared.appendLog("ContentView: processing pending share metadata from AppDelegate")

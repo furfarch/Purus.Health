@@ -26,7 +26,13 @@ final class CloudKitShareParticipantsService {
         do {
             let db = container.privateCloudDatabase
             let shareID = CKRecord.ID(recordName: shareRecordName, zoneID: shareZoneID)
-            let fetched = try await db.record(for: shareID)
+            let fetched: CKRecord?
+            do {
+                fetched = try await db.record(for: shareID)
+            } catch let ck as CKError where ck.code == .unknownItem || ck.code == .zoneNotFound {
+                // Not owned here: a received share is only visible in the shared database.
+                fetched = await CloudKitSharePermissionService.shared.fetchReceivedShare(named: shareRecordName)
+            }
             guard let share = fetched as? CKShare else {
                 record.shareParticipantsSummary = ""
                 return
@@ -39,11 +45,7 @@ final class CloudKitShareParticipantsService {
         }
     }
 
-    private static func formatParticipants(_ participants: [CKShare.Participant]) -> String {
-        struct Line {
-            let label: String
-        }
-
+    static func formatParticipants(_ participants: [CKShare.Participant]) -> String {
         let lines: [String] = participants.map { p in
             let nameOrEmail: String = {
                 if let name = p.userIdentity.nameComponents?.formatted(.name(style: .medium)), !name.isEmpty { return name }

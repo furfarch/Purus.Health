@@ -17,6 +17,8 @@ struct MedicalRecordExport: Codable {
     var medicalhistory: [MedicalHistory]
     var medicaldocument: [MedicalDocument]
     var weights: [Weight]
+    var doctors: [Doctor]
+    var petYearlyCosts: [PetYearlyCost]
 
     struct PersonalInformation: Codable {
         var personalFamilyName: String
@@ -96,11 +98,38 @@ struct MedicalRecordExport: Codable {
         var ownerName: String
         var ownerPhone: String
         var ownerEmail: String
+        var petBreed: String
+        var petColor: String
+        var sex: String
+        var dateOfBirth: String
+        var vetClinicName: String
+        var vetContactName: String
+        var vetPhone: String
+        var vetEmail: String
+        var vetAddress: String
+        var vetNote: String
     }
 
     struct Weight: Codable {
         var weightDate: String
-        var weightKg: Double
+        var weightKg: Double?
         var weightComment: String
+    }
+
+    struct Doctor: Codable {
+        var doctorType: String
+        var doctorName: String
+        var doctorPhone: String
+        var doctorEmail: String
+        var doctorAddress: String
+        var doctorNote: String
+    }
+
+    struct PetYearlyCost: Codable {
+        var costDate: String
+        var costYear: Int
+        var costCategory: String
+        var costAmount: Double
+        var costNote: String
     }
 }

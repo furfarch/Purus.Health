@@ -26,36 +26,32 @@ final class CloudKitSharePermissionService {
         do {
             let db = container.privateCloudDatabase
             let shareID = CKRecord.ID(recordName: shareName, zoneID: shareZoneID)
-            let fetched = try await db.record(for: shareID)
-            guard let share = fetched as? CKShare else { return .unknown }
-
-            // Determine this device's participant permission.
-            // Find the participant matching the current user identity if available.
-            // If not resolvable, fall back to the first accepted participant.
-            var effective: EffectivePermission = .unknown
-
-            if let myRecordID = try? await container.userRecordID() {
-                if let mine = share.participants.first(where: { $0.userIdentity.userRecordID == myRecordID }) {
-                    switch mine.permission {
-                    case .readOnly: effective = .readOnly
-                    case .readWrite: effective = .readWrite
-                    default: break
-                    }
-                }
+            let share: CKShare?
+            do {
+                share = try await db.record(for: shareID) as? CKShare
+            } catch let ck as CKError where ck.code == .unknownItem || ck.code == .zoneNotFound {
+                // Receiver: the share lives in the owner's zone, reachable only via the shared database.
+                share = await fetchReceivedShare(named: shareName)
             }
-
-            if effective == .unknown {
-                if share.participants.contains(where: { $0.permission == .readWrite && $0.acceptanceStatus == .accepted }) {
-                    effective = .readWrite
-                } else if !share.participants.isEmpty {
-                    effective = .readOnly
-                }
+            switch share?.currentUserParticipant?.permission {
+            case .readOnly: return .readOnly
+            case .readWrite: return .readWrite
+            default: return .unknown
             }
-
-            return effective
         } catch {
             ShareDebugStore.shared.appendLog("CloudKitSharePermissionService: permission fetch failed for share=\(shareName): \(error)")
             return .unknown
         }
+    }
+
+    /// Finds a received CKShare by record name across the shared database zones (nil if not found).
+    func fetchReceivedShare(named shareName: String) async -> CKShare? {
+        let sharedDB = container.sharedCloudDatabase
+        guard let zones = try? await sharedDB.allRecordZones() else { return nil }
+        for zone in zones {
+            let id = CKRecord.ID(recordName: shareName, zoneID: zone.zoneID)
+            if let share = try? await sharedDB.record(for: id) as? CKShare { return share }
+        }
+        return nil
     }
 }

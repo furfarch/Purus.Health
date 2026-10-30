@@ -52,7 +52,7 @@ struct RecordEditorSectionPersonal: View {
             Section {
                 TextField("Family Name", text: $record.personalFamilyName)
                 TextField("Given Name", text: $record.personalGivenName)
-                TextField("Name", text: $record.personalNickName)
+                TextField("Nickname", text: $record.personalNickName)
                 
                 Picker("Gender", selection: $record.personalGender) {
                     ForEach(genderOptions, id: \.self) { option in
@@ -69,7 +69,7 @@ struct RecordEditorSectionPersonal: View {
                     displayedComponents: .date
                 )
 
-                TextField("Social Security / ANIS", text: $record.personalSocialSecurityNumber)
+                TextField("AHV / Social Security", text: $record.personalSocialSecurityNumber)
                 TextField("Address", text: $record.personalAddress, axis: .vertical)
                     .lineLimit(1...4)
 

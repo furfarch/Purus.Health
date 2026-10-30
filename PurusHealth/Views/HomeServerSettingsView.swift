@@ -37,7 +37,7 @@ struct HomeServerSettingsView: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .keyboardType(.URL)
-                    .onSubmit { HomeServerSettings.urlString = urlString }
+                    .onSubmit { saveFields() }
                 Button {
                     Task { await testConnection() }
                 } label: {
@@ -139,9 +139,7 @@ struct HomeServerSettingsView: View {
         }
         .navigationTitle("Home Server")
         .task { copyFolder = await EmergencyCopyService.folderDescription() }
-        .onDisappear {
-            HomeServerSettings.urlString = urlString
-        }
+        .onDisappear { saveFields() }
         .onReceive(NotificationCenter.default.publisher(for: HomeServerPairing.didPair)) { _ in refreshPairing() }
         .alert("Remove pairing?", isPresented: $showUnpairConfirm) {
             Button("Remove", role: .destructive) {
@@ -158,7 +156,7 @@ struct HomeServerSettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("All records on this device are replaced with the data from the home server. While the home server is on, the app shows only the home server data. Your iCloud data is not shown and not synced, but it is not deleted: it comes back when you turn the home server off. A backup of the current data is saved to the emergency copy folder first. Nothing from this device is sent to the server.")
+            Text("All records on this device are replaced with the data from the home server. While the home server is on, the app shows only the home server data and iCloud sync is paused. When you turn the home server off, only records that had iCloud sync on are loaded again from iCloud. A backup of the current data is saved to the emergency copy folder first. Nothing from this device is sent to the server.")
         }
         .alert("Turn off home server?", isPresented: $showTurnOffConfirm) {
             Button("Turn off", role: .destructive) {
@@ -167,7 +165,7 @@ struct HomeServerSettingsView: View {
             }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("The records stay on this device and are no longer synced with the home server. iCloud sync works again for records where it is switched on.")
+            Text("The home server records are removed from this device; they stay on the home server and in the emergency copy folder. Records that had iCloud sync on are loaded again from iCloud.")
         }
         .alert("Home server", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             Button("OK", role: .cancel) { errorMessage = nil }
@@ -176,11 +174,20 @@ struct HomeServerSettingsView: View {
         }
     }
 
-    private func saveFields() {
+    /// Only https addresses are saved (same rule as pairing links); anything else is reverted.
+    @discardableResult
+    private func saveFields() -> Bool {
+        guard HomeServerSettings.isValidServer(urlString) else {
+            urlString = HomeServerSettings.urlString
+            testResult = "Only https addresses can be used."
+            return false
+        }
         HomeServerSettings.urlString = urlString
+        return true
     }
 
     private func refreshPairing() {
+        isEnabled = HomeServerSettings.isEnabled
         isPaired = HomeServerSettings.isPaired
         pairedAt = HomeServerSettings.pairedAt
         urlString = HomeServerSettings.urlString
@@ -200,7 +207,7 @@ struct HomeServerSettingsView: View {
     }
 
     private func testConnection() async {
-        saveFields()
+        guard saveFields() else { return }
         isTesting = true
         defer { isTesting = false }
         if let err = await sync.testConnection() {
@@ -211,13 +218,13 @@ struct HomeServerSettingsView: View {
     }
 
     private func connect() async {
-        saveFields()
+        guard saveFields() else { return }
         isConnecting = true
         defer { isConnecting = false }
         do {
             try await sync.enable()
             isEnabled = true
-            errorMessage = "Home server on. While the home server is on, the app shows only the home server data. Your iCloud data is not shown and not synced, but it is not deleted: it comes back when you turn the home server off."
+            errorMessage = "Home server on. While the home server is on, the app shows only the home server data and iCloud sync is paused. When you turn the home server off, only records that had iCloud sync on are loaded again from iCloud."
         } catch {
             isEnabled = false
             errorMessage = error.localizedDescription

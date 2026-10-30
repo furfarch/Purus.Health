@@ -12,54 +12,16 @@ import SwiftData
 
 struct PurusHealthTests {
 
-    @Test func example() async throws {
-        // Write your test here and use APIs like `#expect(...)` to check expected conditions.
-    }
-
-    @Test @MainActor func testModelContainerIsPersistent() async throws {
-        // This test verifies that the ModelContainer is configured for persistent storage
-        // and not in-memory only storage, which would cause data loss on app close.
-
-        let schema = Schema([
-            MedicalRecord.self,
-            BloodEntry.self,
-            DrugEntry.self,
-            VaccinationEntry.self,
-            AllergyEntry.self,
-            IllnessEntry.self,
-            RiskEntry.self,
-            MedicalHistoryEntry.self,
-            MedicalDocumentEntry.self,
-            EmergencyContact.self,
-            WeightEntry.self
-        ])
-
-        let config = ModelConfiguration(
-            schema: schema,
-            isStoredInMemoryOnly: false,
-            cloudKitDatabase: .none
-        )
-
-        let container = try ModelContainer(for: schema, configurations: [config])
-        #expect(config.isStoredInMemoryOnly == false, "ModelContainer should use persistent storage, not in-memory only")
-
-        let context = container.mainContext
-        let testRecord = MedicalRecord()
-        testRecord.personalGivenName = "PersistenceTest"
-        context.insert(testRecord)
-        try context.save()
-
-        context.delete(testRecord)
-        try context.save()
+    /// On-disk store in a fresh temp folder: persistence tests must never touch the real app database.
+    private func tempStoreConfig(_ schema: Schema) -> ModelConfiguration {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return ModelConfiguration(schema: schema, url: dir.appendingPathComponent("test.store"), cloudKitDatabase: .none)
     }
 
     @Test @MainActor func testDataPersistenceAcrossSessions() async throws {
         let schema = Schema([MedicalRecord.self])
-        let config = ModelConfiguration(
-            schema: schema,
-            isStoredInMemoryOnly: false,
-            cloudKitDatabase: .none
-        )
+        let config = tempStoreConfig(schema)
 
         let testUUID = "TEST-PERSISTENCE-12345678-ABCD"
         do {
@@ -115,6 +77,8 @@ struct PurusHealthTests {
         r.isSharingEnabled = true
         #expect(r.locationStatus == .shared)
 
+        r.isSharingEnabled = false
+        r.cloudShareRecordName = nil
         r.isCloudEnabled = false
         #expect(r.locationStatus == .local)
     }
@@ -200,11 +164,7 @@ struct PurusHealthTests {
 
     @Test @MainActor func testPetFieldsPersistence() async throws {
         let schema = Schema([MedicalRecord.self])
-        let config = ModelConfiguration(
-            schema: schema,
-            isStoredInMemoryOnly: false,
-            cloudKitDatabase: .none
-        )
+        let config = tempStoreConfig(schema)
 
         let testUUID = "TEST-PET-FIELDS-12345678-ABCD"
         let birthdate = Date(timeIntervalSince1970: 1609459200) // Jan 1, 2021
@@ -342,7 +302,7 @@ struct PurusHealthTests {
     @Test @MainActor func testRecordListSorting() async throws {
         // Create an in-memory container for testing
         let schema = Schema([MedicalRecord.self])
-        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
+        let config = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         let container = try ModelContainer(for: schema, configurations: [config])
         let context = container.mainContext
 

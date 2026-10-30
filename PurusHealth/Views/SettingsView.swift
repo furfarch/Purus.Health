@@ -2,15 +2,8 @@ import SwiftUI
 import CloudKit
 
 struct SettingsView: View {
-    @Environment(\.dismiss) private var dismiss
-    /// false when shown as the right column on a wide screen (no sheet to close)
-    var showsClose: Bool = true
     @State private var accountStatus: CKAccountStatus?
     @State private var accountStatusError: String?
-
-    // Export UI state
-    @State private var showExportSheet: Bool = false
-    @State private var exportItems: [Any] = []
 
     private let containerIdentifier = AppConfig.CloudKit.containerID
 
@@ -51,14 +44,6 @@ struct SettingsView: View {
 
                 Section {
 
-                    /*
-                    NavigationLink {
-                        DiagnosticsView()
-                    } label: {
-                        Label("Diagnostics", systemImage: "wrench.and.screwdriver")
-                    }
-                    */
-
                     HStack {
                         Text("Status")
                         Spacer()
@@ -90,19 +75,6 @@ struct SettingsView: View {
             .navigationTitle("Settings")
             .task {
                 await refreshAccountStatus()
-            }
-            .sheet(isPresented: $showExportSheet) {
-                ActivityViewController(items: exportItems)
-                    .onAppear {
-                        ShareDebugStore.shared.appendLog("Export sheet presented (items=\(exportItems.count))")
-                    }
-            }
-            .toolbar {
-                #if os(macOS)
-                ToolbarItem(placement: .confirmationAction) {
-                    if showsClose { Button("Close") { dismiss() } }
-                }
-                #endif
             }
         }
     }

@@ -44,8 +44,24 @@ enum HomeServerSettings {
 
     /// Device key from pairing (Home › Devices), sent as `X-Device-Key` header on every call.
     static var deviceKey: String {
-        get { readKeychain(account: keychainAccount) ?? "" }
+        get {
+            if !accessibilityUpdated {
+                accessibilityUpdated = true
+                // keys saved by older builds: keep them, only make them device-only (no backup / device transfer)
+                SecItemUpdate(baseQuery(keychainAccount) as CFDictionary,
+                              [kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly] as CFDictionary)
+            }
+            return readKeychain(account: keychainAccount) ?? ""
+        }
         set { writeKeychain(newValue, account: keychainAccount) }
+    }
+
+    private static var accessibilityUpdated = false
+
+    /// Same rule as pairing: only https addresses with a host.
+    static func isValidServer(_ s: String) -> Bool {
+        guard let u = URL(string: s.trimmingCharacters(in: .whitespacesAndNewlines)) else { return false }
+        return u.scheme == "https" && u.host != nil
     }
 
     static var isPaired: Bool { !deviceKey.isEmpty }
@@ -92,7 +108,7 @@ enum HomeServerSettings {
         guard !value.isEmpty else { return }
         var q = baseQuery(account)
         q[kSecValueData as String] = Data(value.utf8)
-        q[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        q[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
         SecItemAdd(q as CFDictionary, nil)
     }
 }
@@ -101,14 +117,18 @@ enum HomeServerSettings {
 /// QR code = purushealth://pair?code=ph1.<key>&server=<https API address> (opened by the Camera app), or the pasted code.
 enum HomeServerPairing {
     static let didPair = Notification.Name("homeServer.didPair")
+    /// A pairing link arrived; it waits in `pending` until the user confirms it (after Face ID).
+    static let linkReceived = Notification.Name("homeServer.pairLinkReceived")
     private static var lastCode = ""
     private static var lastTime = Date.distantPast
+    private(set) static var pending: (code: String, server: String?)?
 
     static func isPairingURL(_ url: URL) -> Bool {
         url.scheme?.lowercased() == "purushealth" && url.host?.lowercased() == "pair"
     }
 
-    /// Handles a pairing link; returns false for any other URL. Shows the result via `didPair` (ok: Bool).
+    /// Handles a pairing link; returns false for any other URL. A valid link is only queued (see `confirmPending`),
+    /// an invalid one is reported via `didPair` (ok: false).
     @discardableResult
     static func handle(url: URL) -> Bool {
         guard isPairingURL(url) else { return false }
@@ -118,9 +138,37 @@ enum HomeServerPairing {
         if code == lastCode && Date().timeIntervalSince(lastTime) < 5 { return true }
         lastCode = code
         lastTime = Date()
-        let ok = pair(code: code, server: items.first { $0.name == "server" }?.value)
-        NotificationCenter.default.post(name: didPair, object: nil, userInfo: ["ok": ok])
+        guard key(from: code) != nil else {
+            NotificationCenter.default.post(name: didPair, object: nil, userInfo: ["ok": false])
+            return true
+        }
+        let server = items.first { $0.name == "server" }?.value
+        pending = (code, server.flatMap { HomeServerSettings.isValidServer($0) ? $0 : nil })
+        NotificationCenter.default.post(name: linkReceived, object: nil)
         return true
+    }
+
+    /// Server host the pending link would pair with (its own server, else the current one).
+    static var pendingHost: String? {
+        guard let p = pending else { return nil }
+        return URL(string: p.server ?? "")?.host ?? HomeServerSettings.apiURL?.host ?? ""
+    }
+
+    /// User confirmed the pending link: pair now and report via `didPair`.
+    static func confirmPending() {
+        guard let p = pending else { return }
+        pending = nil
+        let ok = pair(code: p.code, server: p.server)
+        NotificationCenter.default.post(name: didPair, object: nil, userInfo: ["ok": ok])
+    }
+
+    static func cancelPending() { pending = nil }
+
+    private static func key(from code: String) -> String? {
+        let c = code.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard c.hasPrefix("ph1.") else { return nil }
+        let key = String(c.dropFirst(4))
+        return key.range(of: "^[A-Za-z0-9_-]{40,100}$", options: .regularExpression) != nil ? key : nil
     }
 
     /// Pasted text: the code itself or the whole pairing link.
@@ -134,11 +182,8 @@ enum HomeServerPairing {
     }
 
     static func pair(code: String, server: String?) -> Bool {
-        let c = code.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard c.hasPrefix("ph1.") else { return false }
-        let key = String(c.dropFirst(4))
-        guard key.range(of: "^[A-Za-z0-9_-]{40,100}$", options: .regularExpression) != nil else { return false }
-        if let server, let u = URL(string: server), u.scheme == "https", u.host != nil {
+        guard let key = key(from: code) else { return false }
+        if let server, HomeServerSettings.isValidServer(server) {
             HomeServerSettings.urlString = server
         }
         HomeServerSettings.deviceKey = key

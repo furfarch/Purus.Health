@@ -39,6 +39,10 @@ struct ExportRecordSheet: View {
                 contentType: .data,
                 defaultFilename: exportURL?.lastPathComponent ?? "export"
             ) { _ in }
+            // Medical data must not linger in tmp once the exporter is closed.
+            .onChange(of: exportURL) { old, _ in
+                if let old { try? FileManager.default.removeItem(at: old) }
+            }
         }
     }
 
@@ -79,12 +83,7 @@ struct ExportRecordSheet: View {
         let safeName = record.displayName.replacingOccurrences(of: "/", with: "-")
         let fileName = "\(safeName.isEmpty ? "MedicalRecord" : safeName).\(type)"
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
-        try data.write(to: url, options: [.atomic])
-
-        // Exports should be unencrypted (no file protection).
-        // This does NOT affect the app's internal database.
-        try? AppFileProtection.apply(to: url, protection: .none)
-
+        try data.write(to: url, options: [.atomic, .completeFileProtection])
         exportURL = url
     }
 

@@ -135,8 +135,7 @@ struct CloudRecordSettingsView: View {
                             record.isSharingEnabled = false
                             return
                         }
-                        // Ask for confirmation + present share UI.
-                        record.isSharingEnabled = true
+                        // Ask for confirmation + present share UI; the flag is set only once the share is saved (CloudShareSheet).
                         pendingShareRecord = record
                         showShareConfirm = true
 

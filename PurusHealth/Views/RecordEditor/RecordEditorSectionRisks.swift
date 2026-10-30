@@ -9,7 +9,7 @@ struct RecordEditorSectionRisks: View {
     var body: some View {
         Section("Riskfactors") {
             ForEach(record.risks) { entry in
-                RiskEntryRowView(entry: entry)
+                RiskEntryRowView(entry: entry, onChange: onChange)
             }
             .onDelete(perform: deleteRisks)
 
@@ -38,6 +38,7 @@ struct RecordEditorSectionRisks: View {
 
 struct RiskEntryRowView: View {
     @Bindable var entry: RiskEntry
+    let onChange: () -> Void
 
     var body: some View {
         VStack(alignment: .leading) {
@@ -49,5 +50,8 @@ struct RiskEntryRowView: View {
             TextField("Riskfactor Name", text: $entry.name)
             TextField("Description / Information / Comment", text: $entry.descriptionOrComment)
         }
+        .onChange(of: entry.date) { onChange() }
+        .onChange(of: entry.name) { onChange() }
+        .onChange(of: entry.descriptionOrComment) { onChange() }
     }
 }

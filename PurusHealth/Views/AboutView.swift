@@ -1,34 +1,6 @@
 import SwiftUI
-import CloudKit
 
 struct AboutView: View {
-    @Environment(\.dismiss) private var dismiss
-    @State private var accountStatusText: String? = nil
-
-    private var platformName: String {
-        #if targetEnvironment(macCatalyst)
-        return "Mac Catalyst"
-        #elseif os(macOS)
-        return "macOS (native)"
-        #else
-        return "iOS"
-        #endif
-    }
-
-    private var buildConfiguration: String {
-        #if DEBUG
-        return "Debug"
-        #else
-        return "Release"
-        #endif
-    }
-
-    private var appVersion: String {
-        let v = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "?"
-        let b = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
-        return "v\(v) (build \(b))"
-    }
-
     private var yearMonthStamp: String {
         let now = Date()
         let formatter = DateFormatter()
@@ -40,26 +12,6 @@ struct AboutView: View {
 
     private var buildNumber: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "?"
-    }
-
-    private func mapAccountStatus(_ s: CKAccountStatus) -> String {
-        switch s {
-        case .available: return "Available"
-        case .noAccount: return "No iCloud account"
-        case .restricted: return "Restricted"
-        case .couldNotDetermine: return "Could not determine"
-        case .temporarilyUnavailable: return "Temporarily unavailable"
-        @unknown default: return "Unknown"
-        }
-    }
-
-    private func refreshICloudStatus() async {
-        do {
-            let status = try await CKContainer(identifier: AppConfig.CloudKit.containerID).accountStatus()
-            accountStatusText = mapAccountStatus(status)
-        } catch {
-            accountStatusText = "Check failed: \(error.localizedDescription)"
-        }
     }
 
     var body: some View {
@@ -79,41 +31,11 @@ struct AboutView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding()
 
-                /*
-                // Runtime diagnostics (visible in About so TestFlight / user can report)
-                VStack(alignment: .leading, spacing: 6) {
-                    Divider()
-                    Text("Runtime info")
-                        .font(.headline)
-                    Text("Platform: \(platformName)")
-                    Text("Mode: \(buildConfiguration)")
-                    Text("Version: \(appVersion)")
-                    Text("Bundle: \(Bundle.main.bundleIdentifier ?? "?")")
-                    if let acct = accountStatusText {
-                        Text("iCloud: \(acct)")
-                    } else {
-                        Text("iCloud: checking…")
-                            .task { await refreshICloudStatus() }
-                    }
-                }
-                .padding(.horizontal)
-                */
-
                 Spacer()
             }
             .padding()
             .navigationTitle("About")
-            .toolbar {
-                #if os(macOS)
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Close") { dismiss() }
-                }
-                #endif
-            }
         }
-        #if os(macOS)
-        .frame(minWidth: 600, minHeight: 400)
-        #endif
     }
 }
 

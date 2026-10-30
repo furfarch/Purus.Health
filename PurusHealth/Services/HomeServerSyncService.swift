@@ -45,9 +45,15 @@ final class HomeServerSyncService: ObservableObject {
     /// Saves made by the sync itself must not start another sync.
     private var ignoreSavesUntil = Date.distantPast
 
+    /// Posted after home server mode was turned off (the app then loads iCloud records again).
+    static let didDisable = Notification.Name("homeServer.didDisable")
+
     private let profileTable = "profiles"
     private let personalTable = "personal_information"
     private let petTable = "pet_information"
+
+    /// The test host launches the whole app: test saves must never reach the home server.
+    private static let underTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
 
     private init() {}
 
@@ -58,8 +64,9 @@ final class HomeServerSyncService: ObservableObject {
         saveObserver = NotificationCenter.default.publisher(for: ModelContext.didSave)
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
-                guard let self, HomeServerSettings.isEnabled, !self.isSyncing,
-                      Date() > self.ignoreSavesUntil else { return }
+                // the window only skips the sync's own saves; dropping it would cost an extra full pull after every sync
+                guard let self, HomeServerSettings.isEnabled, Date() > self.ignoreSavesUntil else { return }
+                if self.isSyncing { self.syncAgain = true; return }
                 self.scheduleSync()
             }
     }
@@ -113,16 +120,25 @@ final class HomeServerSyncService: ObservableObject {
         }
     }
 
+    /// Turns home server mode off: the records from the server are removed from this device
+    /// (they stay on the server and in the emergency copy); records that had iCloud sync on are loaded again from iCloud.
     func disable() {
         pendingSyncTask?.cancel()
         HomeServerSettings.isEnabled = false
         clearState()
+        // every local record came from the server while the mode was on (enable replaced all phone data)
+        if let context = container?.mainContext {
+            for r in (try? context.fetch(FetchDescriptor<MedicalRecord>())) ?? [] { context.delete(r) }
+            try? context.save()
+        }
+        NotificationCenter.default.post(name: Self.didDisable, object: nil)
     }
 
     /// Normal sync: send local changes, then fetch and apply server data.
     func sync() async {
-        guard HomeServerSettings.isEnabled, let context = container?.mainContext else { return }
-        if isSyncing { syncAgain = true; return }
+        guard HomeServerSettings.isEnabled, !Self.underTests, let context = container?.mainContext else { return }
+        // a running sync already pulls the latest data; local saves during it set syncAgain via the save observer
+        if isSyncing { return }
         isSyncing = true
         defer {
             isSyncing = false
@@ -130,20 +146,29 @@ final class HomeServerSyncService: ObservableObject {
         }
 
         do {
-            var state = loadState()
+            let loaded = loadState()
+            var state = loaded ?? SyncState()
+            if loaded == nil {
+                // state lost: take the info row ids and the base for the diff from the server, so nothing is duplicated
+                let current = try await pullAll()
+                try checkApplicable(server: current, context: context)
+                state.adoptInfoIds(from: current, personalTable: personalTable, petTable: petTable)
+                state.snapshot = current
+            }
+            migrateLegacyEmergencyContacts(context: context)
             ensureEntryKeys(context: context)
             let localBefore = localRows(context: context, state: &state)
             saveState(state)
 
-            let changes = buildChanges(local: localBefore, snapshot: state.snapshot)
+            var changes = buildChanges(local: localBefore, snapshot: state.snapshot)
+            // without a real snapshot a missing local row is not a delete
+            if loaded == nil { changes.removeAll { $0["action"] as? String == "delete" } }
             if !changes.isEmpty {
-                let resp = try await post(["action": "sync_push", "changes": changes])
-                if let status = resp["status"] as? String, status != "ok" {
-                    throw SyncError.badResponse("Home server did not accept the changes.")
-                }
+                try Self.checkPushAnswer(try await post(["action": "sync_push", "changes": changes]))
             }
 
             let server = try await pullAll()
+            try checkApplicable(server: server, context: context)
             let changed = !changes.isEmpty || server != state.snapshot
             apply(server: server, localBefore: localBefore, state: &state, context: context)
             ownSave(context)
@@ -169,7 +194,7 @@ final class HomeServerSyncService: ObservableObject {
     /// Full backup of all local data in the home server table format (can be re-imported).
     func fullBackupJSON(context: ModelContext) throws -> Data {
         ensureEntryKeys(context: context)
-        var state = loadState()
+        var state = loadState() ?? SyncState()
         let rows = localRows(context: context, state: &state)
         var tables: [String: [[String: String]]] = [:]
         for (table, byId) in rows {
@@ -219,14 +244,28 @@ final class HomeServerSyncService: ObservableObject {
 
     /// Fetches all data. Result: [table: [id: canonical row incl. profile_id]].
     private func pullAll() async throws -> Snapshot {
-        let resp = try await post(["action": "pull_all"])
+        try parseServer(try await post(["action": "pull_all"]))
+    }
+
+    /// Push answer must say status "ok"; anything else means the changes were not stored.
+    static func checkPushAnswer(_ resp: [String: Any]) throws {
+        guard resp["status"] as? String == "ok" else {
+            throw SyncError.badResponse("Home server did not accept the changes.")
+        }
+    }
+
+    /// Server answer -> snapshot. A missing table is an error: treating it as empty would delete local data.
+    func parseServer(_ resp: [String: Any]) throws -> Snapshot {
         guard resp["profiles"] is [Any] else {
             throw SyncError.badResponse("Home server does not support full fetch yet (Health API workflow needs the update).")
         }
         var out = Snapshot()
         for table in allTables {
+            guard let list = resp[table] as? [[String: Any]] else {
+                throw SyncError.badResponse("Home server answer is incomplete (\(table) missing). Nothing was changed.")
+            }
             var rows: [String: HSRow] = [:]
-            for raw in (resp[table] as? [[String: Any]]) ?? [] {
+            for raw in list {
                 guard let id = (raw["id"] as? String)?.lowercased() else { continue }
                 var row = HSRow()
                 for (k, v) in raw { row[k] = HSValue.canonical(column: k, raw: v) }
@@ -237,6 +276,13 @@ final class HomeServerSyncService: ObservableObject {
             out[table] = rows
         }
         return out
+    }
+
+    /// An answer without any profile while this device has records is treated as a server fault, not as "delete all".
+    func checkApplicable(server: Snapshot, context: ModelContext) throws {
+        if (server[profileTable] ?? [:]).isEmpty, !liveRecords(context).isEmpty {
+            throw SyncError.badResponse("Home server sent no records, but this device has records. Nothing was changed.")
+        }
     }
 
     // MARK: - Local rows
@@ -253,6 +299,20 @@ final class HomeServerSyncService: ObservableObject {
 
     private func liveRecords(_ context: ModelContext) -> [MedicalRecord] {
         ((try? context.fetch(FetchDescriptor<MedicalRecord>())) ?? []).filter { !$0.isMarkedForDeletion }
+    }
+
+    /// The old single emergency contact fields have no home server column: move them into an emergency contact once.
+    private func migrateLegacyEmergencyContacts(context: ModelContext) {
+        for r in liveRecords(context) where !(r.emergencyName + r.emergencyNumber + r.emergencyEmail).isEmpty {
+            let exists = r.emergencyContacts.contains {
+                $0.name == r.emergencyName && $0.phone == r.emergencyNumber && $0.email == r.emergencyEmail
+            }
+            if !exists {
+                let c = EmergencyContact.make(for: r, in: context)
+                c.name = r.emergencyName; c.phone = r.emergencyNumber; c.email = r.emergencyEmail
+            }
+            r.emergencyName = ""; r.emergencyNumber = ""; r.emergencyEmail = ""
+        }
     }
 
     /// Gives every entry a unique UUID key (entries created before home server mode have none).
@@ -383,6 +443,12 @@ final class HomeServerSyncService: ObservableObject {
             guard let before = localBefore else { return false }
             return before[table]?[id] != localNow[table]?[id]
         }
+        /// existed when the sync started and was deleted on the phone since: must not come back from the server copy
+        func deletedDuringSync(_ table: String, _ id: String) -> Bool {
+            localBefore?[table]?[id] != nil && localNow[table]?[id] == nil
+        }
+        // local edits made while the sync ran are sent by another sync right after
+        if let localBefore, localBefore != localNow { syncAgain = true }
 
         var recordsById: [String: MedicalRecord] = [:]
         for r in liveRecords(context) { recordsById[r.uuid.lowercased()] = r }
@@ -407,6 +473,8 @@ final class HomeServerSyncService: ObservableObject {
             let record: MedicalRecord
             if let existing = recordsById[pid] {
                 record = existing
+            } else if deletedDuringSync(profileTable, pid) {
+                continue
             } else {
                 record = MedicalRecord(uuid: pid, isPet: isPet)
                 context.insert(record)
@@ -430,7 +498,8 @@ final class HomeServerSyncService: ObservableObject {
         // Entries
         for type in entryTypes {
             applyEntries(type, server: server[type.table] ?? [:], recordsById: recordsById,
-                         replace: replace, localBefore: localBefore, editedDuringSync: editedDuringSync, context: context)
+                         replace: replace, localBefore: localBefore, editedDuringSync: editedDuringSync,
+                         deletedDuringSync: deletedDuringSync, context: context)
         }
 
         // Records no longer on the server
@@ -446,7 +515,8 @@ final class HomeServerSyncService: ObservableObject {
 
     private func applyEntries<T: HomeServerEntry>(
         _ type: T.Type, server: [String: HSRow], recordsById: [String: MedicalRecord],
-        replace: Bool, localBefore: Snapshot?, editedDuringSync: (String, String) -> Bool, context: ModelContext
+        replace: Bool, localBefore: Snapshot?, editedDuringSync: (String, String) -> Bool,
+        deletedDuringSync: (String, String) -> Bool, context: ModelContext
     ) {
         var localByKey: [String: T] = [:]
         for r in recordsById.values { for e in T.entries(of: r) { localByKey[e.syncKey.lowercased()] = e } }
@@ -457,7 +527,7 @@ final class HomeServerSyncService: ObservableObject {
             if var existing = localByKey[id] {
                 if editedDuringSync(T.table, id) { continue }
                 if existing.canonical() != canon { existing.apply(canon) }
-            } else {
+            } else if !deletedDuringSync(T.table, id) {
                 var e = T.make(for: record, in: context)
                 e.syncKey = id
                 e.apply(canon)
@@ -492,6 +562,14 @@ final class HomeServerSyncService: ObservableObject {
         mutating func setInfoId(_ id: String, for pid: String, pet: Bool) {
             if pet { petInfoIds[pid] = id } else { personalInfoIds[pid] = id }
         }
+
+        mutating func adoptInfoIds(from server: Snapshot, personalTable: String, petTable: String) {
+            for t in [personalTable, petTable] {
+                for (id, row) in server[t] ?? [:] {
+                    if let pid = row["profile_id"] { setInfoId(id, for: pid, pet: t == petTable) }
+                }
+            }
+        }
     }
 
     private var stateURL: URL {
@@ -501,10 +579,10 @@ final class HomeServerSyncService: ObservableObject {
         return dir.appendingPathComponent("sync-state.json")
     }
 
-    private func loadState() -> SyncState {
-        guard let data = try? Data(contentsOf: stateURL),
-              let s = try? JSONDecoder().decode(SyncState.self, from: data) else { return SyncState() }
-        return s
+    /// nil = no readable state (missing or damaged file).
+    private func loadState() -> SyncState? {
+        guard let data = try? Data(contentsOf: stateURL) else { return nil }
+        return try? JSONDecoder().decode(SyncState.self, from: data)
     }
 
     private func saveState(_ s: SyncState) {

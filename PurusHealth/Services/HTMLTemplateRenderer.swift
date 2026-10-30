@@ -67,7 +67,17 @@ enum HTMLTemplateRenderer {
 
         let weightsTable = table(
             headers: ["Date", "Weight (kg)", "Comment"],
-            rows: recordExport.weights.map { [$0.weightDate, String(format: "%.1f", $0.weightKg), $0.weightComment] }
+            rows: recordExport.weights.map { [$0.weightDate, $0.weightKg.map { String(format: "%.1f", $0) } ?? "", $0.weightComment] }
+        )
+
+        let doctorsTable = table(
+            headers: ["Type", "Name", "Phone", "Email", "Address", "Note"],
+            rows: recordExport.doctors.map { [$0.doctorType, $0.doctorName, $0.doctorPhone, $0.doctorEmail, $0.doctorAddress, $0.doctorNote] }
+        )
+
+        let petCostsTable = table(
+            headers: ["Date", "Year", "Category", "Amount", "Note"],
+            rows: recordExport.petYearlyCosts.map { [$0.costDate, String($0.costYear), $0.costCategory, String(format: "%.2f", $0.costAmount), $0.costNote] }
         )
 
         // Personal / Pet HTML
@@ -77,9 +87,22 @@ enum HTMLTemplateRenderer {
     <div class=\"kv\">
       <div class=\"key\">Name</div><div>\(esc(pet.personalName))</div>
       <div class=\"key\">Animal ID (ANIS)</div><div>\(esc(pet.personalAnimalID))</div>
+      <div class=\"key\">Breed</div><div>\(esc(pet.petBreed))</div>
+      <div class=\"key\">Colour</div><div>\(esc(pet.petColor))</div>
+      <div class=\"key\">Sex</div><div>\(esc(pet.sex))</div>
+      <div class=\"key\">Date of Birth</div><div>\(esc(pet.dateOfBirth))</div>
       <div class=\"key\">Owner Name</div><div>\(esc(pet.ownerName))</div>
       <div class=\"key\">Owner Phone</div><div>\(esc(pet.ownerPhone))</div>
       <div class=\"key\">Owner Email</div><div>\(esc(pet.ownerEmail))</div>
+    </div>
+    <h2>Veterinarian</h2>
+    <div class=\"kv\">
+      <div class=\"key\">Clinic</div><div>\(esc(pet.vetClinicName))</div>
+      <div class=\"key\">Contact</div><div>\(esc(pet.vetContactName))</div>
+      <div class=\"key\">Phone</div><div>\(esc(pet.vetPhone))</div>
+      <div class=\"key\">Email</div><div>\(esc(pet.vetEmail))</div>
+      <div class=\"key\">Address</div><div>\(esc(pet.vetAddress))</div>
+      <div class=\"key\">Note</div><div>\(esc(pet.vetNote))</div>
     </div>
 """
             } else {
@@ -153,6 +176,8 @@ enum HTMLTemplateRenderer {
     \(emergencyHTML)
   </div>
 
+  \(recordExport.isPet ? "" : "<h2>Treating Doctors</h2>\n  \(doctorsTable)")
+
   <h2>Blood Values</h2>
   \(bloodTable)
 
@@ -178,6 +203,8 @@ enum HTMLTemplateRenderer {
   \(risksTable)
 
   \(recordExport.isPet ? "<h2>Weight</h2>\n  \(weightsTable)" : "")
+
+  \(recordExport.isPet ? "<h2>Yearly Costs</h2>\n  \(petCostsTable)" : "")
 
   <footer>
     Built: \(buildDate) — by furfarch

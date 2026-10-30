@@ -14,7 +14,8 @@ enum HSValue {
         let f = DateFormatter()
         f.calendar = Calendar(identifier: .gregorian)
         f.locale = Locale(identifier: "en_US_POSIX")
-        f.timeZone = TimeZone.current
+        // one fixed zone, so a date never shifts by a day when the phone is in another time zone
+        f.timeZone = TimeZone(identifier: "Europe/Zurich")
         f.dateFormat = "yyyy-MM-dd"
         return f
     }()
@@ -81,7 +82,6 @@ protocol HomeServerEntry: PersistentModel {
     static func entries(of record: MedicalRecord) -> [Self]
     static func make(for record: MedicalRecord, in context: ModelContext) -> Self
     var syncKey: String { get set }
-    var parentRecord: MedicalRecord? { get }
     func canonical() -> HSRow
     func apply(_ row: HSRow)
     /// Server row -> canonical row (override when fields are combined in the app).
@@ -109,7 +109,6 @@ extension BloodEntry: HomeServerEntry {
         let e = BloodEntry(); context.insert(e); e.record = record; return e
     }
     var syncKey: String { get { syncID } set { syncID = newValue } }
-    var parentRecord: MedicalRecord? { record }
     func canonical() -> HSRow { ["entry_date": HSValue.day(date), "name": name, "comment": comment] }
     func apply(_ r: HSRow) { date = HSValue.parseDay(r["entry_date"]); name = r["name"] ?? ""; comment = r["comment"] ?? "" }
 }
@@ -122,7 +121,6 @@ extension DrugEntry: HomeServerEntry {
         let e = DrugEntry(); context.insert(e); e.record = record; return e
     }
     var syncKey: String { get { syncID } set { syncID = newValue } }
-    var parentRecord: MedicalRecord? { record }
     func canonical() -> HSRow { ["entry_date": HSValue.day(date), "name": nameAndDosage, "comment": comment] }
     func apply(_ r: HSRow) { date = HSValue.parseDay(r["entry_date"]); nameAndDosage = r["name"] ?? ""; comment = r["comment"] ?? "" }
 
@@ -159,7 +157,6 @@ extension VaccinationEntry: HomeServerEntry {
         let e = VaccinationEntry(); context.insert(e); e.record = record; return e
     }
     var syncKey: String { get { syncID } set { syncID = newValue } }
-    var parentRecord: MedicalRecord? { record }
     func canonical() -> HSRow {
         ["entry_date": HSValue.day(date), "name": name, "information": information, "place": place, "comment": comment]
     }
@@ -177,7 +174,6 @@ extension AllergyEntry: HomeServerEntry {
         let e = AllergyEntry(); context.insert(e); e.record = record; return e
     }
     var syncKey: String { get { syncID } set { syncID = newValue } }
-    var parentRecord: MedicalRecord? { record }
     func canonical() -> HSRow { ["entry_date": HSValue.day(date), "name": name, "information": information, "comment": comment] }
     func apply(_ r: HSRow) {
         date = HSValue.parseDay(r["entry_date"]); name = r["name"] ?? ""; information = r["information"] ?? ""; comment = r["comment"] ?? ""
@@ -192,7 +188,6 @@ extension IllnessEntry: HomeServerEntry {
         let e = IllnessEntry(); context.insert(e); e.record = record; return e
     }
     var syncKey: String { get { syncID } set { syncID = newValue } }
-    var parentRecord: MedicalRecord? { record }
     func canonical() -> HSRow { ["entry_date": HSValue.day(date), "name": name, "comment": informationOrComment] }
     func apply(_ r: HSRow) { date = HSValue.parseDay(r["entry_date"]); name = r["name"] ?? ""; informationOrComment = r["comment"] ?? "" }
 }
@@ -205,7 +200,6 @@ extension RiskEntry: HomeServerEntry {
         let e = RiskEntry(); context.insert(e); e.record = record; return e
     }
     var syncKey: String { get { syncID } set { syncID = newValue } }
-    var parentRecord: MedicalRecord? { record }
     func canonical() -> HSRow { ["entry_date": HSValue.day(date), "name": name, "comment": descriptionOrComment] }
     func apply(_ r: HSRow) { date = HSValue.parseDay(r["entry_date"]); name = r["name"] ?? ""; descriptionOrComment = r["comment"] ?? "" }
 }
@@ -218,7 +212,6 @@ extension MedicalHistoryEntry: HomeServerEntry {
         let e = MedicalHistoryEntry(); context.insert(e); e.record = record; return e
     }
     var syncKey: String { get { syncID } set { syncID = newValue } }
-    var parentRecord: MedicalRecord? { record }
     func canonical() -> HSRow {
         ["entry_date": HSValue.day(date), "name": name, "contact": contact, "comment": informationOrComment]
     }
@@ -235,7 +228,6 @@ extension MedicalDocumentEntry: HomeServerEntry {
         let e = MedicalDocumentEntry(); context.insert(e); e.record = record; return e
     }
     var syncKey: String { get { syncID } set { syncID = newValue } }
-    var parentRecord: MedicalRecord? { record }
     func canonical() -> HSRow { ["entry_date": HSValue.day(date), "name": name, "comment": note] }
     func apply(_ r: HSRow) { date = HSValue.parseDay(r["entry_date"]); name = r["name"] ?? ""; note = r["comment"] ?? "" }
 }
@@ -248,7 +240,6 @@ extension WeightEntry: HomeServerEntry {
         let e = WeightEntry(); context.insert(e); e.record = record; return e
     }
     var syncKey: String { get { uuid } set { uuid = newValue } }
-    var parentRecord: MedicalRecord? { record }
     func canonical() -> HSRow { ["entry_date": HSValue.day(date), "weight_kg": HSValue.decimal(weightKg), "comment": comment] }
     func apply(_ r: HSRow) {
         date = HSValue.parseDay(r["entry_date"])
@@ -266,7 +257,6 @@ extension HumanDoctorEntry: HomeServerEntry {
         let e = HumanDoctorEntry(); context.insert(e); e.record = record; return e
     }
     var syncKey: String { get { uuid } set { uuid = newValue } }
-    var parentRecord: MedicalRecord? { record }
     func canonical() -> HSRow {
         ["name": name, "specialty": type, "phone": phone, "email": email, "address": address, "comment": note]
     }
@@ -288,7 +278,6 @@ extension EmergencyContact: HomeServerEntry {
         get { id.uuidString.lowercased() }
         set { id = UUID(uuidString: newValue) ?? UUID() }
     }
-    var parentRecord: MedicalRecord? { record }
     func canonical() -> HSRow { ["name": name, "phone": phone, "email": email, "note": note] }
     func apply(_ r: HSRow) { name = r["name"] ?? ""; phone = r["phone"] ?? ""; email = r["email"] ?? ""; note = r["note"] ?? "" }
 }
@@ -301,7 +290,6 @@ extension PetYearlyCostEntry: HomeServerEntry {
         let e = PetYearlyCostEntry(); context.insert(e); e.record = record; return e
     }
     var syncKey: String { get { uuid } set { uuid = newValue } }
-    var parentRecord: MedicalRecord? { record }
     func canonical() -> HSRow {
         ["entry_date": HSValue.day(date), "year": String(year), "category": category,
          "amount": HSValue.decimal(amount), "comment": note]

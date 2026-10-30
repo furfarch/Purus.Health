@@ -39,12 +39,18 @@ final class AppLock: ObservableObject {
         showCover()
     }
 
+    /// app not in front (app switcher, Control Center): hide the records without locking
+    func cover() {
+        showCover()
+    }
+
     /// app is in front: ask once by itself
     func appBecameActive() {
-        guard locked, autoPrompt else { return }
         #if canImport(UIKit)
         guard UIApplication.shared.applicationState == .active else { return }
         #endif
+        if !locked { hideCover(); return }
+        guard autoPrompt else { return }
         autoPrompt = false
         Task { await unlock() }
     }
@@ -82,16 +88,21 @@ final class AppLock: ObservableObject {
         w.windowLevel = .alert + 1
         let host = UIHostingController(rootView: LockedView().environmentObject(self))
         host.view.backgroundColor = UIColor(red: 0.11, green: 0.11, blue: 0.12, alpha: 1)
+        // VoiceOver and a hardware keyboard must not reach the records behind the cover
+        host.view.accessibilityViewIsModal = true
         w.rootViewController = host
-        w.isHidden = false
+        w.makeKeyAndVisible()
         coverWindow = w
         #endif
     }
 
     private func hideCover() {
         #if canImport(UIKit)
-        coverWindow?.isHidden = true
+        guard let w = coverWindow else { return }
+        w.isHidden = true
         coverWindow = nil
+        // give the keyboard back to the app window
+        w.windowScene?.windows.first { $0 !== w && !$0.isHidden && $0.windowLevel == .normal }?.makeKey()
         #endif
     }
 }

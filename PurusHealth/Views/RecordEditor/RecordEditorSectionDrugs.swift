@@ -9,7 +9,7 @@ struct RecordEditorSectionDrugs: View {
     var body: some View {
         Section("Medications") {
             ForEach(record.drugs) { entry in
-                DrugEntryRowView(entry: entry)
+                DrugEntryRowView(entry: entry, onChange: onChange)
             }
             .onDelete(perform: deleteDrugs)
 
@@ -38,6 +38,7 @@ struct RecordEditorSectionDrugs: View {
 
 struct DrugEntryRowView: View {
     @Bindable var entry: DrugEntry
+    let onChange: () -> Void
 
     var body: some View {
         VStack(alignment: .leading) {
@@ -49,5 +50,8 @@ struct DrugEntryRowView: View {
             TextField("Medication Name & Dosage", text: $entry.nameAndDosage)
             TextField("Comment (Why, Schedule)", text: $entry.comment)
         }
+        .onChange(of: entry.date) { onChange() }
+        .onChange(of: entry.nameAndDosage) { onChange() }
+        .onChange(of: entry.comment) { onChange() }
     }
 }

@@ -17,6 +17,8 @@ struct RecordEditorSectionPetYearlyCosts: View {
         // Normalize whitespace
         var s = trimmed.replacingOccurrences(of: "\u{00A0}", with: "")
         s = s.replacingOccurrences(of: " ", with: "")
+        // Swiss grouping: 1'200 / 1’200
+        s.removeAll { $0 == "'" || $0 == "\u{2019}" }
 
         // Count separators
         let dotCount = s.filter { $0 == "." }.count
@@ -92,7 +94,6 @@ struct RecordEditorSectionPetYearlyCosts: View {
                             entry.category
                         }, set: { new in
                             entry.category = new
-                            record.updatedAt = Date()
                             onChange()
                         }))
                         .font(.headline)
@@ -119,7 +120,6 @@ struct RecordEditorSectionPetYearlyCosts: View {
                             entry.date = new
                             // Keep year in sync by default
                             entry.year = Calendar.current.component(.year, from: new)
-                            record.updatedAt = Date()
                             onChange()
                         }), displayedComponents: .date)
                         .labelsHidden()
@@ -136,10 +136,11 @@ struct RecordEditorSectionPetYearlyCosts: View {
                             amountCache[entry.uuid] = new
                             if let parsed = parseAmount(new) {
                                 entry.amount = parsed
-                            } else {
+                            } else if new.trimmingCharacters(in: .whitespaces).isEmpty {
                                 entry.amount = 0
+                            } else {
+                                return // unparsable: keep the previous amount
                             }
-                            record.updatedAt = Date()
                             onChange()
                         })
 
@@ -157,16 +158,14 @@ struct RecordEditorSectionPetYearlyCosts: View {
                             entry.year
                         }, set: { new in
                             entry.year = new
-                            record.updatedAt = Date()
                             onChange()
-                        }), format: .number)
+                        }), format: .number.grouping(.never))
                         .frame(width: 100)
 
                         TextField("Note", text: Binding(get: {
                             entry.note
                         }, set: { new in
                             entry.note = new
-                            record.updatedAt = Date()
                             onChange()
                         }))
                         .foregroundStyle(.secondary)

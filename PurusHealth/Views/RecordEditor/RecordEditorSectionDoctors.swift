@@ -23,10 +23,13 @@ struct RecordEditorSectionDoctors: View {
                 let doctor = record.humanDoctors[idx]
                 VStack(alignment: .leading, spacing: 12) {
                     ContactPickerButton(title: "Pick from Contacts") { contact in
-                        doctor.name = contact.displayName
-                        doctor.phone = contact.phone
-                        doctor.email = contact.email
-                        doctor.address = contact.postalAddress
+                        // Only overwrite fields the contact actually has (same as PetVet).
+                        let name = contact.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !name.isEmpty { doctor.name = name }
+                        if !contact.phone.isEmpty { doctor.phone = contact.phone }
+                        if !contact.email.isEmpty { doctor.email = contact.email }
+                        let address = contact.postalAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !address.isEmpty { doctor.address = address }
                         onChange()
                     }
 

@@ -35,9 +35,4 @@ final class PendingShareStore {
             return m
         }
     }
-
-    /// Legacy method - prefer consumeURL() or consumeMetadata()
-    func consume() -> URL? {
-        return consumeURL()
-    }
 }

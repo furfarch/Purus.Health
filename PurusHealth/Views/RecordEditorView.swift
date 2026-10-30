@@ -9,6 +9,7 @@ struct RecordEditorView: View {
     @State private var isEditing: Bool
     @State private var saveErrorMessage: String?
     @State private var showCloudSettings: Bool = false
+    @State private var cloudSyncTask: Task<Void, Never>?
 
     // MARK: - Permissions
     @State private var effectivePermission: CloudKitSharePermissionService.EffectivePermission = .unknown
@@ -37,14 +38,13 @@ struct RecordEditorView: View {
             }
         }
         .navigationTitle(record.displayName)
-        #if os(iOS) || targetEnvironment(macCatalyst)
         .navigationBarTitleDisplayMode(.inline)
-        #endif
         .task { await refreshSharePermission() }
         .onReceive(NotificationCenter.default.publisher(for: NotificationNames.didImportRecords)) { _ in
             Task { await refreshSharePermission() }
         }
         .onChange(of: record.cloudShareRecordName) { _, _ in Task { await refreshSharePermission() } }
+        .onChange(of: effectivePermission) { _, new in if new == .readOnly { isEditing = false } }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 if !isSharedReadOnly {
@@ -59,43 +59,16 @@ struct RecordEditorView: View {
                 }
             }
 
-            #if os(iOS) || targetEnvironment(macCatalyst)
             ToolbarItem(placement: .navigationBarLeading) {
-                if isEditing {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Button("Cloud & Sharing") {
-                            showCloudSettings = true
-                        }
-                        .disabled(isSharedReadOnly)
-                        .help(isWaitingForShareAttachment ? "Waiting for share acceptance" : "")
-
-                        if effectivePermission == .readWrite {
-                            Button("Manage Sharing") {
-                                showCloudSettings = true
-                            }
-                        }
+                // iCloud sharing does not apply when records sync through the home server.
+                if isEditing && !HomeServerSettings.isEnabled {
+                    Button("Cloud & Sharing") {
+                        showCloudSettings = true
                     }
+                    .disabled(isSharedReadOnly)
+                    .help(isWaitingForShareAttachment ? "Waiting for share acceptance" : "")
                 }
             }
-            #else
-            ToolbarItem(placement: .automatic) {
-                if isEditing {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Button("Cloud & Sharing") {
-                            showCloudSettings = true
-                        }
-                        .disabled(isSharedReadOnly)
-                        .help(isWaitingForShareAttachment ? "Waiting for share acceptance" : "")
-
-                        if effectivePermission == .readWrite {
-                            Button("Manage Sharing") {
-                                showCloudSettings = true
-                            }
-                        }
-                    }
-                }
-            }
-            #endif
         }
         .toolbar {
             ToolbarItem(placement: .status) {
@@ -156,7 +129,7 @@ struct RecordEditorView: View {
     }
 
     private var emergencySummary: String {
-        let contacts = record.emergencyContacts
+        let contacts = record.emergencyContacts.sortedByName
         if let first = contacts.first {
             return joined([first.name, first.phone]) + (contacts.count > 1 ? " · +\(contacts.count - 1) more" : "")
         }
@@ -204,13 +177,13 @@ struct RecordEditorView: View {
                         rows: m.map { [dateText($0.date), $0.nameAndDosage, $0.comment] })
 
             let v = record.vaccinations.sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
-            entriesFold("Vaccinations", columns: ["Date", "Name", "Place", "Comment"], dates: v.map(\.date),
-                        rows: v.map { [dateText($0.date), $0.name, $0.place, $0.comment] })
+            entriesFold("Vaccinations", columns: ["Date", "Name", "Information", "Place", "Comment"], dates: v.map(\.date),
+                        rows: v.map { [dateText($0.date), $0.name, $0.information, $0.place, $0.comment] })
 
             if !record.isPet {
                 let a = record.allergy.sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
-                entriesFold("Allergies", columns: ["Date", "Name", "Comment"], dates: a.map(\.date),
-                            rows: a.map { [dateText($0.date), $0.name, $0.comment] })
+                entriesFold("Allergies", columns: ["Date", "Name", "Information", "Comment"], dates: a.map(\.date),
+                            rows: a.map { [dateText($0.date), $0.name, $0.information, $0.comment] })
             }
 
             let i = record.illness.sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
@@ -282,7 +255,11 @@ struct RecordEditorView: View {
             try modelContext.save()
             // Automatically sync cloud-enabled records after save
             if record.isCloudEnabled {
-                Task {
+                // Debounced: one CloudKit sync after typing pauses, not one per keystroke.
+                cloudSyncTask?.cancel()
+                cloudSyncTask = Task {
+                    try? await Task.sleep(nanoseconds: 1_500_000_000)
+                    guard !Task.isCancelled else { return }
                     do {
                         try await CloudSyncService.shared.syncIfNeeded(record: record)
                     } catch {

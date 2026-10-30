@@ -5,7 +5,7 @@ struct RecordViewerSectionEmergency: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            let contacts = record.emergencyContacts
+            let contacts = record.emergencyContacts.sortedByName
 
             if !contacts.isEmpty {
                 ForEach(contacts, id: \.self) { contact in

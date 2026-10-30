@@ -10,7 +10,7 @@ struct RecordEditorSectionBlood: View {
         if record.isPet { EmptyView() } else {
         Section("Blood Values") {
             ForEach(record.blood) { entry in
-                BloodEntryRowView(entry: entry)
+                BloodEntryRowView(entry: entry, onChange: onChange)
             }
             .onDelete(perform: deleteBlood)
 
@@ -40,6 +40,7 @@ struct RecordEditorSectionBlood: View {
 
 struct BloodEntryRowView: View {
     @Bindable var entry: BloodEntry
+    let onChange: () -> Void
 
     var body: some View {
         VStack(alignment: .leading) {
@@ -51,5 +52,8 @@ struct BloodEntryRowView: View {
             TextField("Value Name", text: $entry.name)
             TextField("Comment", text: $entry.comment)
         }
+        .onChange(of: entry.date) { onChange() }
+        .onChange(of: entry.name) { onChange() }
+        .onChange(of: entry.comment) { onChange() }
     }
 }

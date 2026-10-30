@@ -36,12 +36,20 @@ enum EmergencyCopyService {
         let stamp = fileStamp()
         let url = folder.appendingPathComponent("\(prefix) \(stamp).json")
         try data.write(to: url, options: .atomic)
+        // keep only the newest 3 of this kind (the stamp in the name sorts by time)
+        let old = ((try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? [])
+            .filter { $0.lastPathComponent.hasPrefix(prefix + " ") && $0.pathExtension == "json" }
+            .sorted { $0.lastPathComponent > $1.lastPathComponent }
+            .dropFirst(3)
+        for u in old { try? FileManager.default.removeItem(at: u) }
         return url
     }
 
     /// Emergency copy: PDF per record + full JSON backup. Replaces the previous copy.
     @MainActor
     static func writeEmergencyCopy(records: [MedicalRecord], backup: Data) async throws {
+        // never replace a copy with nothing: an empty set is kept as the last good copy
+        guard !records.isEmpty else { return }
         let folder = await baseFolder().appendingPathComponent("Emergency", isDirectory: true)
         let fm = FileManager.default
         try fm.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -49,7 +57,7 @@ enum EmergencyCopyService {
         try backup.write(to: folder.appendingPathComponent("Purus Health - all records.json"), options: .atomic)
 
         var written = Set<String>()
-        for record in records.sorted(by: { $0.sortKey < $1.sortKey }) {
+        for record in records.sorted(by: { ($0.sortKey, $0.uuid) < ($1.sortKey, $1.uuid) }) {
             var name = safeFileName(record.displayName)
             if written.contains(name) { name += " " + String(record.uuid.prefix(4)) }
             written.insert(name)

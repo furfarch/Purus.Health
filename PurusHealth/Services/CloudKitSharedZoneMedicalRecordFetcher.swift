@@ -36,13 +36,63 @@ final class CloudKitSharedZoneMedicalRecordFetcher {
         // Home server mode: iCloud sync is paused
         if HomeServerSettings.isEnabled { return 0 }
         let zones = try await fetchAllRecordZones()
-        guard !zones.isEmpty else { return 0 }
 
         var totalFetched = 0
+        var returnedUUIDs = Set<String>()
+        var complete = true
         for zone in zones {
-            totalFetched += try await fetchAllShared(in: zone.zoneID)
+            // One failing zone must not stop the others.
+            do {
+                let fetched = try await fetchAllShared(in: zone.zoneID)
+                totalFetched += fetched.count
+                returnedUUIDs.formUnion(fetched.compactMap { $0["uuid"] as? String })
+            } catch {
+                complete = false
+                ShareDebugStore.shared.appendLog("CloudKitSharedZoneMedicalRecordFetcher: zone \(zone.zoneID.zoneName) failed: \(error)")
+            }
+        }
+        // Only a complete fetch proves a record is no longer shared.
+        if complete {
+            await removeUnsharedReceivedRecords(keeping: returnedUUIDs)
         }
         return totalFetched
+    }
+
+    /// Deletes local received records whose share is gone. A record counts as received when it has a share name
+    /// but no root in this user's private share zone (owners always have one).
+    private func removeUnsharedReceivedRecords(keeping returned: Set<String>) async {
+        guard let context = modelContext else { return }
+        let candidates = ((try? context.fetch(FetchDescriptor<MedicalRecord>())) ?? []).filter {
+            $0.cloudShareRecordName != nil && !$0.isMarkedForDeletion && !returned.contains($0.uuid)
+        }
+        guard !candidates.isEmpty else { return }
+
+        let zoneID = CKRecordZone.ID(zoneName: AppConfig.CloudKit.shareZoneName, ownerName: CKCurrentUserDefaultName)
+        let ids = candidates.map { CKRecord.ID(recordName: $0.cloudRecordName ?? $0.uuid, zoneID: zoneID) }
+        var notOwned = Set<CKRecord.ID>()
+        do {
+            let results = try await container.privateCloudDatabase.records(for: ids)
+            for (id, result) in results {
+                if case .failure(let err) = result, (err as? CKError)?.code == .unknownItem { notOwned.insert(id) }
+            }
+        } catch let ck as CKError where ck.code == .zoneNotFound {
+            notOwned = Set(ids)
+        } catch {
+            ShareDebugStore.shared.appendLog("CloudKitSharedZoneMedicalRecordFetcher: ownership check failed, skipping cleanup: \(error)")
+            return
+        }
+        guard !notOwned.isEmpty else { return }
+
+        for (record, id) in zip(candidates, ids) where notOwned.contains(id) {
+            ShareDebugStore.shared.appendLog("CloudKitSharedZoneMedicalRecordFetcher: removing no-longer-shared record uuid=\(record.uuid)")
+            context.delete(record)
+        }
+        do {
+            try context.save()
+            NotificationCenter.default.post(name: NotificationNames.didImportRecords, object: nil)
+        } catch {
+            ShareDebugStore.shared.appendLog("CloudKitSharedZoneMedicalRecordFetcher: failed saving cleanup: \(error)")
+        }
     }
 
     // MARK: - Zones
@@ -61,7 +111,7 @@ final class CloudKitSharedZoneMedicalRecordFetcher {
 
     // MARK: - Query
 
-    private func fetchAllShared(in zoneID: CKRecordZone.ID) async throws -> Int {
+    private func fetchAllShared(in zoneID: CKRecordZone.ID) async throws -> [CKRecord] {
         let query = CKQuery(recordType: recordType, predicate: NSPredicate(value: true))
         let op = CKQueryOperation(query: query)
         op.zoneID = zoneID
@@ -71,14 +121,14 @@ final class CloudKitSharedZoneMedicalRecordFetcher {
             if case .success(let rec) = result { fetched.append(rec) }
         }
 
-        return try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Int, Error>) in
+        return try await withCheckedThrowingContinuation { (cont: CheckedContinuation<[CKRecord], Error>) in
             op.queryResultBlock = { [weak self] result in
                 DispatchQueue.main.async {
                     switch result {
                     case .success:
-                        guard let self else { cont.resume(returning: 0); return }
+                        guard let self else { cont.resume(returning: []); return }
                         self.importToSwiftData(records: fetched)
-                        cont.resume(returning: fetched.count)
+                        cont.resume(returning: fetched)
                     case .failure(let err):
                         cont.resume(throwing: err)
                     }
@@ -105,6 +155,17 @@ final class CloudKitSharedZoneMedicalRecordFetcher {
 
             guard let uuid = ckRecord["uuid"] as? String else { continue }
 
+            // Owner deleted the record: remove the received copy.
+            if let isDeleted = ckRecord["isDeleted"] as? NSNumber, isDeleted.boolValue {
+                let tombstoned = FetchDescriptor<MedicalRecord>(predicate: #Predicate { $0.uuid == uuid })
+                if let existing = (try? context.fetch(tombstoned))?.first {
+                    ShareDebugStore.shared.appendLog("CloudKitSharedZoneMedicalRecordFetcher: deleting from tombstone uuid=\(uuid)")
+                    context.delete(existing)
+                    SharedImportSuppression.clear(uuid)
+                }
+                continue
+            }
+
             let cloudUpdatedAt = (ckRecord["updatedAt"] as? Date) ?? Date.distantPast
 
             let fetchDescriptor = FetchDescriptor<MedicalRecord>(predicate: #Predicate { $0.uuid == uuid })
@@ -123,39 +184,7 @@ final class CloudKitSharedZoneMedicalRecordFetcher {
                 ShareDebugStore.shared.appendLog("CloudKitSharedZoneMedicalRecordFetcher: creating new record uuid=\(uuid)")
             }
 
-            record.createdAt = ckRecord["createdAt"] as? Date ?? record.createdAt
-            record.updatedAt = cloudUpdatedAt
-
-            record.personalFamilyName = ckRecord["personalFamilyName"] as? String ?? ""
-            record.personalGivenName = ckRecord["personalGivenName"] as? String ?? ""
-            record.personalNickName = ckRecord["personalNickName"] as? String ?? ""
-            record.personalGender = ckRecord["personalGender"] as? String ?? ""
-            record.personalBirthdate = ckRecord["personalBirthdate"] as? Date
-            record.personalSocialSecurityNumber = ckRecord["personalSocialSecurityNumber"] as? String ?? ""
-            record.personalAddress = ckRecord["personalAddress"] as? String ?? ""
-            record.personalHealthInsurance = ckRecord["personalHealthInsurance"] as? String ?? ""
-            record.personalHealthInsuranceNumber = ckRecord["personalHealthInsuranceNumber"] as? String ?? ""
-            record.personalEmployer = ckRecord["personalEmployer"] as? String ?? ""
-
-            if let boolVal = ckRecord["isPet"] as? Bool {
-                record.isPet = boolVal
-            } else if let num = ckRecord["isPet"] as? NSNumber {
-                record.isPet = num.boolValue
-            }
-
-            record.personalName = ckRecord["personalName"] as? String ?? ""
-            record.personalAnimalID = ckRecord["personalAnimalID"] as? String ?? ""
-            record.ownerName = ckRecord["ownerName"] as? String ?? ""
-            record.ownerPhone = ckRecord["ownerPhone"] as? String ?? ""
-            record.ownerEmail = ckRecord["ownerEmail"] as? String ?? ""
-            record.emergencyName = ckRecord["emergencyName"] as? String ?? ""
-            record.emergencyNumber = ckRecord["emergencyNumber"] as? String ?? ""
-            record.emergencyEmail = ckRecord["emergencyEmail"] as? String ?? ""
-
-            // Read isSharingEnabled mirrored as Int64 (0/1) from CloudKit if present
-            if let num = ckRecord["isSharingEnabled"] as? NSNumber {
-                record.isSharingEnabled = (num.int64Value != 0)
-            }
+            CloudKitMedicalRecordFetcher.apply(ckRecord: ckRecord, to: record, context: context)
 
             // Shared records should always be marked as shared and cloud-enabled
             // since they exist in CloudKit (even if user hasn't enabled global cloud sync).
